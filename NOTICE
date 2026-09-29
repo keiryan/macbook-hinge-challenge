@@ -1,0 +1,14 @@
+MacBook hinge challenge
+Copyright 2026 Keiryan Wilson
+
+Licensed under the Apache License, Version 2.0.
+
+Sensor discovery and report-format research references:
+  samhenrigold/LidAngleSensor (Apache-2.0 upstream project)
+  https://github.com/samhenrigold/LidAngleSensor
+
+  TANG617/LidPerspective (including its WebHID findings)
+  https://github.com/TANG617/LidPerspective
+
+No upstream source files, binaries, or assets are vendored in this project.
+See docs/attribution.md for research attribution.

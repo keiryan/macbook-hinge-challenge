@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'none'; base-uri 'none'; form-action 'none'">
+<title>MacBook hinge check</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f6f4ef;color:#242723;font:16px/1.5 system-ui,sans-serif}main{max-width:1050px;margin:35px auto;padding:0 28px}h1{font-size:38px;font-weight:600;letter-spacing:-1.2px;margin:0 0 10px}h2{font-size:22px;font-weight:550;margin:0 0 8px}.intro{max-width:730px;color:#5f655e}.eyebrow{font-size:12px;letter-spacing:1.6px;text-transform:uppercase;color:#667060}button{font:inherit;padding:10px 16px;border:1px solid #bfc7b8;background:#fdfcf9;border-radius:7px;cursor:pointer;margin:0 8px 8px 0}button.primary{background:#345541;color:white;border-color:#345541}button:disabled{opacity:.45;cursor:default}button:focus-visible{outline:3px solid #ae8955;outline-offset:3px}#status{min-height:25px;font-size:14px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin:24px 0}.panel{border:1px solid #d4d9ce;border-radius:12px;padding:24px;background:#fcfbf7}.readout{display:flex;align-items:baseline;gap:12px;margin:15px 0}#angle{font-size:88px;line-height:1.1;font-weight:400;letter-spacing:-5px}.muted{color:#677064}.small{font-size:13px}dl{display:grid;grid-template-columns:145px 1fr;gap:7px;margin:18px 0 0;font-size:13px}dt{color:#677064}dd{margin:0;overflow-wrap:anywhere}code,pre{font:12px/1.5 ui-monospace,monospace}pre{white-space:pre-wrap;background:#eeeee6;padding:14px;border-radius:6px;max-height:200px;overflow:auto}table{border-collapse:collapse;width:100%;font-size:12px}th,td{text-align:left;padding:7px;border-bottom:1px solid #ddd}details{margin:20px 0}footer{margin:28px 0;color:#677064;font-size:13px}a{color:#345541}#target{font-size:42px;line-height:1.2;margin:18px 0 6px;font-weight:450}#challenge-status{min-height:48px;font-size:14px}progress{width:100%;height:12px;accent-color:#345541}.track{height:10px;margin:40px 12px 9px;background:#e4e5dc;position:relative;border-radius:10px}.band{position:absolute;top:-3px;height:16px;border:1px solid #527454;background:#abc4a7;border-radius:3px;display:none}.dot{position:absolute;top:-4px;width:18px;height:18px;border:3px solid #fcfbf7;border-radius:50%;background:#242723;transform:translateX(-50%);display:none}.scale{display:flex;justify-content:space-between;color:#677064;font-size:11px;margin:0 10px}.steps{display:flex;gap:7px;margin:12px 0}.step{width:26px;height:26px;border-radius:50%;border:1px solid #bfc7b8;text-align:center;font-size:13px;line-height:24px}.done{background:#345541;color:white}.active{border-color:#345541;border-width:2px;line-height:22px}#source-name{font-size:12px;text-transform:uppercase;letter-spacing:.7px}#challenge-meta{min-height:22px}#native-note{margin-top:5px}@media(max-width:750px){main{margin:22px auto;padding:0 18px}.grid{grid-template-columns:1fr;gap:16px}h1{font-size:30px}.panel{padding:20px}#angle{font-size:68px}table{font-size:11px}}
+</style>
+<main>
+<p class="eyebrow">Physical interaction experiment</p>
+<h1>Move the screen. Meet the angle.</h1>
+<p class="intro">A live MacBook lid reader and a three-step hinge challenge. Use direct browser reports, or try the native reader for more frequent reads. Move only within your screen’s normal range.</p>
+<div><button id="connect" class="primary">Connect browser sensor</button><button id="native">Use native reader</button><button id="stop" disabled>Disconnect</button></div>
+<p id="status" role="status">Checking sensor access…</p>
+<div class="grid">
+<section class="panel">
+<h2>Live angle</h2><p id="source-name" class="muted">No source connected</p>
+<div class="readout"><span id="angle">—</span><span class="muted">degrees</span></div>
+<p id="freshness" class="small muted">Waiting for a real measurement.</p>
+<dl>
+<dt>Browser arrivals</dt><dd id="rate">—</dd><dt>Arrival interval</dt><dd id="interval">—</dd><dt>Native read timing</dt><dd id="native-timing">—</dd><dt>Discarded native reads</dt><dd id="discarded">0</dd><dt>Angle changes</dt><dd id="changes">—</dd><dt>Raw report</dt><dd><code id="raw">—</code></dd><dt>Total accepted</dt><dd id="count">0</dd><dt>Device</dt><dd id="device">Not connected</dd>
+</dl>
+<p id="native-note" class="small muted">Read frequency and hardware update frequency are different. The display does not smooth or invent angles.</p>
+</section>
+<section class="panel">
+<h2>Hinge challenge</h2><p class="small muted">Reach three random angles. Stay near each target until successive received reports within ±3° span at least half a second.</p>
+<div class="steps" aria-label="Challenge progress"><span class="step" id="step0">1</span><span class="step" id="step1">2</span><span class="step" id="step2">3</span></div>
+<p id="target">Ready when you are.</p>
+<p id="challenge-status" role="status">Connect a sensor and receive a fresh angle to begin.</p>
+<div class="track"><span class="band" id="band"></span><span class="dot" id="dot"></span></div><div class="scale"><span>55°</span><span>90°</span><span>125°</span></div>
+<p id="challenge-meta" class="small muted">Targets stay between 65° and 110°.</p>
+<progress id="hold" max="1" value="0" aria-label="Time spanned by matching received reports"></progress>
+<p><button id="start" class="primary" disabled>Start challenge</button><button id="cancel" disabled>Cancel</button></p>
+<p class="small muted">Local experiment. Completion shows this page received matching readings; it is not server-verified proof of a human.</p>
+</section>
+</div>
+<details><summary>Timing and raw reports</summary>
+<p class="small muted">Browser arrival and native read-completion times are separate; neither is a hardware capture timestamp. Native reads delayed more than 150 ms are discarded. Native mode requests up to 60 reads/s; repeated values may reflect the same sensor measurement.</p>
+<table><thead><tr><th>Received by browser</th><th>Arrival gap</th><th>Native read completed</th><th>Bridge delay</th><th>Source</th><th>Bytes</th><th>Angle</th></tr></thead><tbody id="rows"></tbody></table>
+</details>
+<details><summary>Connection diagnostics</summary><pre id="diagnostic"></pre></details>
+<footer>Browser mode uses WebHID Input Report 1. Native mode uses a local, read-only IOKit helper and a loopback connection. Readings stay on this Mac. <a href="https://github.com/TANG617/LidPerspective/blob/main/web/README.md" target="_blank" rel="noreferrer">Sensor research</a>.</footer>
+</main>
+<script src="hinge-challenge.js"></script>
+<script src="app.js"></script>
+</html>

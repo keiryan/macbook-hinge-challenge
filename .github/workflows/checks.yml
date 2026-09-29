@@ -1,0 +1,33 @@
+name: Checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-checks:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test challenge and freshness logic without a sensor
+        run: node --test tests/*.test.js
+      - name: Check server, browser scripts, and launcher syntax
+        run: |
+          python3 -m py_compile scripts/serve.py
+          node --check web/app.js
+          node --check web/hinge-challenge.js
+          bash -n scripts/run.sh
+      - name: Compile native reader without opening a device
+        run: |
+          mkdir -p .build/module-cache
+          xcrun swiftc -O -module-cache-path .build/module-cache native/lid-reader.swift -o .build/lid-reader
