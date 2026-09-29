@@ -4,9 +4,42 @@ A live MacBook lid-angle reader and a small physical-interaction experiment: mov
 
 The demo supports direct browser access through WebHID and an optional Swift helper for more frequent reads. All readings stay on the Mac. No third-party runtime packages or accounts are required.
 
+## Compatibility
+
+**You need a MacBook running macOS with a readable built-in lid-angle sensor.** The sensor must expose the interface used by this demo and return angle readings as the screen moves. A simple lid-open/lid-closed switch is not enough.
+
+These are candidate hardware families to try, subject to the check below. The linked Apple repair manuals document the sensor in their starting models:
+
+| Hardware guide | Evidence of a lid-angle sensor |
+| --- | --- |
+| 14- or 16-inch MacBook Pro, 2021 or later | Apple's [14-inch (2021)](https://support.apple.com/en-us/100555) and [16-inch (2021)](https://support.apple.com/en-us/100574) sensor replacement procedures. |
+| MacBook Air with M2 or later | Apple's [M2 (2022) repair manual](https://support.apple.com/en-us/100603) lists the Lid Angle Sensor. |
+
+**Sensor presence alone does not guarantee support.** Apple's manuals document the hardware; this demo also depends on an undocumented HID interface. Later models still need the same check.
+
+- **Browser mode:** use current desktop Chrome or Edge with WebHID enabled, over HTTPS or localhost, and grant sensor access. See [Chrome's WebHID documentation](https://developer.chrome.com/docs/capabilities/hid). Safari lacks WebHID ([WebKit documentation](https://webkit.org/tracking-prevention/#anti-fingerprinting)).
+- **Native mode:** use the [local setup](#run-locally) with Python 3 and the Swift compiler from Xcode or its Command Line Tools. The locally served page can be used in Safari.
+
+Development readings in both modes were observed on an **M3 Max MacBook Pro (`Mac15,8`) running macOS 27.0**; native movement was confirmed by hand. This is one tested configuration, not a minimum macOS version. Broader model and OS coverage remains unverified.
+
+<details>
+<summary>Check whether your Mac exposes the expected sensor</summary>
+
+Run this read-only command in Terminal; it requires no download or administrator access:
+
+```sh
+hidutil list --matching '{"VendorID":1452,"ProductID":33028,"PrimaryUsagePage":32,"PrimaryUsage":138}'
+```
+
+A matching device row means macOS exposes the identifiers used by [both readers](docs/architecture.md#sensor-access): vendor `0x05ac`, product `0x8104`, usage page `0x20`, usage `0x8a`. Headers without a device row mean this demo cannot find its expected sensor. Discovery alone does not prove readable reports: connect in your chosen mode and confirm that the displayed angle changes when you gently move the screen. Browser and native access must be checked separately.
+
+The upstream [LidAngleSensor compatibility notes](https://github.com/samhenrigold/LidAngleSensor#faq) identify the M1 MacBook Air and 13-inch M1/M2 Touch Bar MacBook Pro as problematic. They also trace the sensor to the 2019 16-inch Intel MacBook Pro, which remains unverified with this demo. Chip generation or release year alone does not establish compatibility.
+
+</details>
+
 ## Hosted page
 
-Open [the hosted demo](https://macbook-hinge-challenge-min3.vercel.app/) in a browser with WebHID support, such as desktop Chrome or Edge, to try direct sensor access on a compatible MacBook. Browser support and hardware availability are checked separately; opening the page alone does not grant access to a sensor.
+Open [the hosted demo](https://macbook-hinge-challenge-min3.vercel.app/) in a browser with WebHID support, such as desktop Chrome or Edge, to try direct sensor access on a [compatible MacBook](#compatibility). Browser support and hardware availability are checked separately; opening the page alone does not grant access to a sensor.
 
 The faster native mode runs **locally on your Mac**, using the setup below. Vercel serves the web page; it cannot run the Swift helper against your laptop's hardware. The hosted page includes local setup instructions for native mode and browsers without WebHID, including Safari.
 
@@ -16,7 +49,7 @@ A deployment can be Ready yet return 404 at `/` if the published directory has n
 
 ## Run locally
 
-You need a compatible MacBook and Python 3. Native mode also needs the Swift compiler included with Xcode or its Command Line Tools. The script checks prerequisites; it does not install software or use `sudo`.
+You need a [compatible MacBook](#compatibility) and Python 3. Native mode also needs the Swift compiler included with Xcode or its Command Line Tools. The script checks prerequisites; it does not install software or use `sudo`.
 
 ```sh
 git clone https://github.com/keiryan/macbook-hinge-challenge.git
