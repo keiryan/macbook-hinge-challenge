@@ -24,6 +24,7 @@
 </aside>
 <div><button id="connect" class="primary">Connect browser sensor</button><button id="native">Use native reader</button><button id="stop" disabled>Disconnect</button></div>
 <p id="status" role="status">Checking sensor access…</p>
+<p class="small muted"><strong>Want smoother tracking? Native mode delivered about 50× more frequent readings.</strong> On the tested Mac, we observed about 50 native reads per second versus one browser report per second. <a href="https://github.com/keiryan/macbook-hinge-challenge#run-locally" target="_blank" rel="noreferrer">Set up the local native reader</a>. Rates vary by Mac; this compares read frequency, not measured latency.</p>
 <details id="local-setup" hidden>
 <summary id="local-setup-summary">Run the native reader locally</summary>
 <p class="small muted">This hosted demo can read the sensor through WebHID on compatible MacBooks. The faster native reader needs a helper running on your own Mac; it is not available from this hosted page.</p>

@@ -4,6 +4,8 @@ A live MacBook lid-angle reader and a small physical-interaction experiment: mov
 
 The demo supports direct browser access through WebHID and an optional Swift helper for more frequent reads. All readings stay on the Mac. No third-party runtime packages or accounts are required.
 
+> **For smoother tracking, use native mode.** On the tested Mac, native mode delivered about **50 sensor reads per second**, compared with about **one browser report per second**: roughly **50× more frequent readings**. [Run the native reader locally](#run-locally). These are observed read rates; results vary by Mac. See [what to expect](#what-to-expect) for the measurement limits.
+
 ## Compatibility
 
 **You need a MacBook running macOS with a readable built-in lid-angle sensor.** The sensor must expose the interface used by this demo and return angle readings as the screen moves. A simple lid-open/lid-closed switch is not enough.
@@ -76,7 +78,7 @@ Use `--port 8770` if the default port is occupied. The server accepts loopback c
 | Browser | Lid sensor → WebHID input report → page | Around one report per second on the tested Mac, which makes motion appear delayed. |
 | Native | Lid sensor → IOKit feature-report read → local Python stream → page | Requests up to 60 reads/s; around 50 reads/s were observed during development. |
 
-The user physically moved the screen and confirmed that native mode followed it smoothly. That is a hands-on observation, **not a measured latency benchmark**. Read frequency is not necessarily the sensor's physical measurement frequency; repeated reads can contain the same value. The page displays received integer angles without smoothing or invented samples.
+The roughly **50× difference is in reading frequency**. The user physically moved the screen and confirmed that native mode followed it smoothly. That is a hands-on observation, **not a measured latency benchmark**. Read frequency is not necessarily the sensor's physical measurement frequency; repeated reads can contain the same value. The page displays received integer angles without smoothing or invented samples.
 
 This uses an undocumented, model-dependent sensor interface. A MacBook may lack the expected sensor or expose different reports. Compatibility across models and macOS releases is unverified. If no sensor appears, the demo cannot provide a reading. Move the screen gently within its normal range; never force the hinge.
 
