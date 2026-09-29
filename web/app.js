@@ -1,6 +1,9 @@
 'use strict';
 const $=id=>document.getElementById(id), filter={vendorId:0x05ac,productId:0x8104,usagePage:0x20,usage:0x8a};
 const flatten=cs=>cs.flatMap(c=>[c,...flatten(c.children||[])]),hex=(n,w=2)=>n.toString(16).padStart(w,'0');
+const localOrigin=['127.0.0.1','localhost','[::1]'].includes(location.hostname)&&['http:','https:'].includes(location.protocol);
+const hostedMode=!localOrigin;
+const browserSensorAvailable=isSecureContext&&!!navigator.hid&&typeof navigator.hid.getDevices==='function'&&typeof navigator.hid.requestDevice==='function';
 let sensor=null,aborter=null,source=null,busy=false,generation=0;
 let latest=null,received=0,arrivals=[],changeTimes=[],recent=[],previousAngle=null,lastGap=null,challenge=null;
 let tableDirty=false,frame=0,lastRender=0;
@@ -22,7 +25,7 @@ function nativeFreshness(item,nowEpochMs,previous,minimumEpochMs){
  return {sequence:item.sequence,readCompletedMonoMs:item.readCompletedMonoMs,readCompletedEpochMs:item.readCompletedEpochMs,delayMs:Math.max(0,delayMs),readGapMs:previous?item.readCompletedMonoMs-previous.readCompletedMonoMs:null};
 }
 function buttons(){
- $('connect').disabled=busy||!('hid'in navigator)||source==='browser';$('native').disabled=busy||source==='native';$('stop').disabled=busy||!source;
+ $('connect').disabled=busy||!browserSensorAvailable||source==='browser';$('native').disabled=busy||source==='native';$('stop').disabled=busy||!source;
  $('start').disabled=busy||document.hidden||!source||!latest||reportAge(performance.now())>freshnessLimit()||(challenge&&challenge.getState(performance.now()).status==='active');
  $('cancel').disabled=!challenge||challenge.getState(performance.now()).status!=='active';
 }
@@ -64,12 +67,13 @@ async function stop(reason='Disconnected.'){
  $('status').textContent=reason;$('source-name').textContent='Disconnected · last value retained';buttons();render();
 }
 async function browserConnect(){
+ if(!browserSensorAvailable){$('status').textContent=browserAvailabilityMessage();return;}
  if(busy)return;busy=true;buttons();await stop('Connecting browser sensor…');const run=++generation;
  try{
   const granted=await navigator.hid.getDevices();
   let candidate=granted.find(d=>d.vendorId===filter.vendorId&&d.productId===filter.productId&&flatten(d.collections).some(c=>c.usagePage===filter.usagePage&&c.usage===filter.usage));
   if(!candidate){const choices=await navigator.hid.requestDevice({filters:[filter]});candidate=choices[0];}
-  if(!candidate){$('status').textContent='No device selected. Try native mode if this browser cannot expose the sensor.';return;}
+  if(!candidate){$('status').textContent=hostedMode?'No device selected. If the sensor is unavailable here, set up the native reader locally.':'No device selected. Try native mode if this browser cannot expose the sensor.';return;}
   if(candidate.vendorId!==filter.vendorId||candidate.productId!==filter.productId||!flatten(candidate.collections).some(c=>c.usagePage===filter.usagePage&&c.usage===filter.usage))throw new Error('The selected device is not the expected lid sensor.');
   if(run!==generation)return;
   resetMeasurements();sensor=candidate;source='browser';sensor.addEventListener('inputreport',input);await sensor.open();
@@ -78,6 +82,9 @@ async function browserConnect(){
  }catch(e){await stop(e.name+': '+e.message);log(e.message);}finally{busy=false;buttons();}
 }
 async function nativeConnect(){
+ // Hosted pages must never try native endpoints or reach across origins to a
+ // local helper. The native path is available only from a loopback page.
+ if(hostedMode){showLocalSetup();return;}
  if(busy)return;busy=true;buttons();await stop('Connecting local native reader…');const run=++generation;const controller=new AbortController();aborter=controller;
  try{
   const response=await fetch('/session',{headers:{'X-Hinge-Client':'1'},signal:controller.signal});if(!response.ok)throw new Error('Native server unavailable. Run scripts/run.sh to enable this mode.');
@@ -91,6 +98,14 @@ async function nativeConnect(){
   }
   if(run===generation)await stop('Native stream ended.');
  }catch(e){if(run===generation){await stop(e.name==='AbortError'?'Disconnected.':e.message);log(e.message);busy=false;buttons();}}finally{if(run===generation){busy=false;buttons();}}
+}
+function browserAvailabilityMessage(){
+ if(!isSecureContext)return 'Direct sensor access requires HTTPS or a localhost page. Open the HTTPS demo, or follow the local native setup.';
+ return hostedMode?'This browser does not support WebHID. Open this demo in desktop Chrome or Edge, or set up the native reader locally.':'WebHID is unavailable here. Use the local native reader, or open this page in desktop Chrome or Edge.';
+}
+function showLocalSetup(){
+ $('local-setup').open=true;$('local-setup').scrollIntoView({behavior:'smooth',block:'nearest'});$('local-setup-summary').focus();
+ $('status').textContent='Native mode runs on your Mac. Follow the local setup below, then open the loopback page.';
 }
 function randomInt(range){const limit=Math.floor(4294967296/range)*range,word=new Uint32Array(1);do{crypto.getRandomValues(word);}while(word[0]>=limit);return word[0]%range;}
 function startChallenge(){
@@ -124,8 +139,11 @@ function render(){
  if(tableDirty&&now-lastRender>250){$('rows').textContent='';for(const item of recent){const row=document.createElement('tr');for(const value of [item.time,item.gap===null?'—':item.gap.toFixed(1)+' ms',item.nativeTiming?localTime(item.nativeTiming.readCompletedEpochMs):'—',item.nativeTiming?item.nativeTiming.delayMs.toFixed(1)+' ms':'—',item.source,item.raw,item.angle+'°']){const td=document.createElement('td');td.textContent=value;row.append(td);}$('rows').append(row);}tableDirty=false;lastRender=now;}
 }
 $('connect').onclick=browserConnect;$('native').onclick=nativeConnect;$('stop').onclick=async()=>{busy=true;buttons();await stop();busy=false;buttons();};$('start').onclick=startChallenge;$('cancel').onclick=()=>{challenge?.abort('Cancelled.');render();};
-if('hid'in navigator)navigator.hid.addEventListener('disconnect',e=>{if(e.device===sensor)void stop('Sensor disconnected.');});
-$('status').textContent='hid'in navigator?'Ready. Choose direct browser access or the local native reader.':'WebHID is unavailable here. Use the local native reader, or open this page in Chrome.';
+if(browserSensorAvailable)navigator.hid.addEventListener('disconnect',e=>{if(e.device===sensor)void stop('Sensor disconnected.');});
+$('local-setup').hidden=!hostedMode;$('local-setup').open=hostedMode&&!browserSensorAvailable;
+$('native').textContent=hostedMode?'Set up native reader':'Use native reader';
+if(!browserSensorAvailable)$('connect').textContent=isSecureContext?'WebHID unavailable':'HTTPS required';
+$('status').textContent=browserSensorAvailable?(hostedMode?'Ready. Connect directly through WebHID here, or set up the native reader locally.':'Ready. Choose direct browser access or the local native reader.'):browserAvailabilityMessage();
 window.addEventListener('pagehide',()=>{aborter?.abort();if(sensor?.opened)void sensor.close();});
 document.addEventListener('visibilitychange',()=>{
  if(document.hidden)challenge?.abort('Page hidden. Start a new challenge after returning.');

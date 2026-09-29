@@ -2,7 +2,17 @@
 
 A live MacBook lid-angle reader and a small physical-interaction experiment: move the screen to three random angles and hold near each one.
 
-The demo supports direct browser access through WebHID and an optional Swift helper for more frequent reads. All readings stay on the Mac. There are no third-party runtime packages, accounts, or remote services.
+The demo supports direct browser access through WebHID and an optional Swift helper for more frequent reads. All readings stay on the Mac. No third-party runtime packages or accounts are required.
+
+## Hosted page
+
+Open [the hosted demo](https://macbook-hinge-challenge-min3.vercel.app/) in a browser with WebHID support, such as desktop Chrome or Edge, to try direct sensor access on a compatible MacBook. Browser support and hardware availability are checked separately; opening the page alone does not grant access to a sensor.
+
+The faster native mode runs **locally on your Mac**, using the setup below. Vercel serves the web page; it cannot run the Swift helper against your laptop's hardware. The hosted page includes local setup instructions for native mode and browsers without WebHID, including Safari.
+
+To deploy your own copy on Vercel, import this repository with **Root Directory left at the repository root** and **Framework Preset: Other**. The checked-in `vercel.json` disables the build command and publishes `web/`, so `web/index.html` becomes `/`. Do not set Root Directory to `web` as well. No Python server, Swift compiler, functions, or environment variables are required on Vercel. After changing an existing project's settings, redeploy it.
+
+A deployment can be Ready yet return 404 at `/` if the published directory has no `index.html`. If `/web/index.html` works instead, the repository root was published rather than `web/`.
 
 ## Run locally
 

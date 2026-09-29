@@ -4,12 +4,12 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm');
 const {HingeChallenge}=require('../web/hinge-challenge.js');
 const script=fs.readFileSync(require('node:path').join(__dirname,'../web/app.js'),'utf8');
-function fixture(){
+function fixture(options={}){
  let clock=1000;const elements=new Map(),listeners={};
- function element(){return {textContent:'',disabled:false,style:{},append(){},className:'',value:0};}
+ function element(){return {textContent:'',disabled:false,hidden:false,open:false,style:{},append(){},scrollIntoView(){},focus(){},className:'',value:0};}
  const document={hidden:false,getElementById(id){if(!elements.has(id))elements.set(id,element());return elements.get(id);},createElement:element,addEventListener(type,fn){listeners[type]=fn;}};
  class ClockDate extends Date {constructor(...args){super(...(args.length?args:[clock]));}static now(){return clock;}}
- const context=vm.createContext({document,Date:ClockDate,HingeChallenge,performance:{now:()=>clock},navigator:{},window:{addEventListener(){}},requestAnimationFrame:()=>1,setInterval:()=>1,crypto:{getRandomValues(a){a[0]=0;return a;}}});
+ const context=vm.createContext({document,Date:ClockDate,HingeChallenge,performance:{now:()=>clock},navigator:options.navigator||{},location:options.location||{hostname:'127.0.0.1',protocol:'http:'},isSecureContext:options.isSecureContext??true,fetch:options.fetch||(()=>{throw new Error('Unexpected network request in offline test');}),AbortController,TextDecoder,window:{addEventListener(){}},requestAnimationFrame:()=>1,setInterval:()=>1,crypto:{getRandomValues(a){a[0]=0;return a;}}});
  vm.runInContext(script,context);
  return {context,document,setTime(value){clock=value;},run(code){return vm.runInContext(code,context);},hidden(value){document.hidden=value;listeners.visibilitychange();}};
 }
@@ -49,4 +49,45 @@ test('hidden page aborts challenge and resuming requires a read completed after 
  f.setTime(1150);f.hidden(false);
  deliver(f,packet({sequence:3,readCompletedMonoMs:1040,readCompletedEpochMs:1149}));assert.equal(f.run('latest'),null);
  f.setTime(1170);deliver(f,packet({sequence:4,readCompletedMonoMs:1060,readCompletedEpochMs:1160}));assert.equal(f.run('latest.angle'),75);
+});
+
+test('hosted native button shows local setup and never fetches native endpoints',async()=>{
+ const requests=[];
+ const f=fixture({location:{hostname:'hinge-demo.example',protocol:'https:'},fetch:async path=>{requests.push(path);throw new Error('No hosted native endpoint');}});
+ assert.equal(f.document.getElementById('native').textContent,'Set up native reader');
+ assert.equal(f.document.getElementById('local-setup').hidden,false);
+ await f.document.getElementById('native').onclick();
+ await f.run('nativeConnect()');
+ assert.deepEqual(requests,[]);
+ assert.equal(f.document.getElementById('local-setup').open,true);
+ assert.match(f.document.getElementById('status').textContent,/runs on your Mac/);
+});
+
+test('hosted unsupported or insecure browsers explain why direct access is disabled',async()=>{
+ const safari=fixture({location:{hostname:'hinge-demo.example',protocol:'https:'}});
+ assert.equal(safari.document.getElementById('connect').disabled,true);
+ assert.equal(safari.document.getElementById('connect').textContent,'WebHID unavailable');
+ assert.match(safari.document.getElementById('status').textContent,/Chrome or Edge.*native reader locally/);
+ const hid={getDevices:async()=>[],requestDevice:async()=>[],addEventListener(){}};
+ const insecure=fixture({location:{hostname:'hinge-demo.example',protocol:'http:'},isSecureContext:false,navigator:{hid}});
+ assert.equal(insecure.document.getElementById('connect').disabled,true);
+ assert.equal(insecure.document.getElementById('connect').textContent,'HTTPS required');
+ await insecure.run('browserConnect()');
+ assert.match(insecure.document.getElementById('status').textContent,/requires HTTPS/);
+ const secure=fixture({location:{hostname:'hinge-demo.example',protocol:'https:'},navigator:{hid}});
+ assert.equal(secure.document.getElementById('connect').disabled,false);
+});
+
+test('loopback native mode still requests its session and authenticated sensor stream',async()=>{
+ const requests=[];
+ const f=fixture({fetch:async(path,options)=>{
+  requests.push({path,options});
+  return path==='/session'?{ok:true,json:async()=>({token:'offline-test-token',nativeAvailable:true})}:{ok:true,body:{getReader:()=>({read:async()=>({done:true})})}};
+ }});
+ assert.equal(f.document.getElementById('local-setup').hidden,true);
+ assert.equal(f.document.getElementById('native').textContent,'Use native reader');
+ await f.document.getElementById('native').onclick();
+ assert.deepEqual(requests.map(request=>request.path),['/session','/sensor']);
+ assert.equal(requests[1].options.headers['X-Hinge-Key'],'offline-test-token');
+ assert.match(f.document.getElementById('status').textContent,/Native stream ended/);
 });

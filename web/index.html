@@ -10,9 +10,16 @@
 <main>
 <p class="eyebrow">Physical interaction experiment</p>
 <h1>Move the screen. Meet the angle.</h1>
-<p class="intro">A live MacBook lid reader and a three-step hinge challenge. Use direct browser reports, or try the native reader for more frequent reads. Move only within your screen’s normal range.</p>
+<p class="intro">A live MacBook lid reader and a three-step hinge challenge. Use direct browser reports, or run the native reader locally for more frequent reads. Move only within your screen’s normal range.</p>
 <div><button id="connect" class="primary">Connect browser sensor</button><button id="native">Use native reader</button><button id="stop" disabled>Disconnect</button></div>
 <p id="status" role="status">Checking sensor access…</p>
+<details id="local-setup" hidden>
+<summary id="local-setup-summary">Run the native reader locally</summary>
+<p class="small muted">This hosted demo can read the sensor through WebHID on compatible MacBooks. The faster native reader needs a helper running on your own Mac; it is not available from this hosted page.</p>
+<p class="small">Follow the <a href="https://github.com/keiryan/macbook-hinge-challenge#run-locally" target="_blank" rel="noreferrer">GitHub setup instructions</a>. With Python 3 and Apple’s Swift compiler installed, run this from the downloaded project directory:</p>
+<pre><code>./scripts/run.sh</code></pre>
+<p class="small">Then open <a href="http://127.0.0.1:8768/" target="_blank" rel="noreferrer">http://127.0.0.1:8768/</a> and choose <strong>Use native reader</strong>. A compatible sensor is required in either mode.</p>
+</details>
 <div class="grid">
 <section class="panel">
 <h2>Live angle</h2><p id="source-name" class="muted">No source connected</p>
