@@ -107,6 +107,17 @@ function showLocalSetup(){
  $('local-setup').open=true;$('local-setup').scrollIntoView({behavior:'smooth',block:'nearest'});$('local-setup-summary').focus();
  $('status').textContent='Native mode runs on your Mac. Follow the local setup below, then open the loopback page.';
 }
+function showCompatibilityNotice(){
+ if(!hostedMode||!isSecureContext||browserSensorAvailable)return;
+ const dialog=$('compatibility-dialog'),dismiss=$('compatibility-dismiss'),key='hinge-browser-notice-dismissed';
+ if(!dialog||!dismiss||typeof dialog.showModal!=='function'||typeof dialog.close!=='function')return;
+ try{if(sessionStorage.getItem(key)==='1')return;}catch{}
+ // Native close covers both the button and Escape. Storage may be blocked;
+ // acknowledging the notice must still leave the page usable in that case.
+ dialog.addEventListener('close',()=>{try{sessionStorage.setItem(key,'1');}catch{}});
+ dismiss.onclick=()=>dialog.close();
+ try{dialog.showModal();}catch{}
+}
 function randomInt(range){const limit=Math.floor(4294967296/range)*range,word=new Uint32Array(1);do{crypto.getRandomValues(word);}while(word[0]>=limit);return word[0]%range;}
 function startChallenge(){
  const now=performance.now();if(busy||document.hidden||!latest||reportAge(now)>freshnessLimit()||!source)return;
@@ -151,4 +162,4 @@ document.addEventListener('visibilitychange',()=>{
  // Resuming needs a new report; a pre-hide value cannot enable Start.
  latest=null;arrivals=[];changeTimes=[];previousAngle=null;lastGap=null;$('angle').textContent='—';render();
 });
-setInterval(render,100);render();
+setInterval(render,100);render();showCompatibilityNotice();

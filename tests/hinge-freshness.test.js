@@ -6,10 +6,11 @@ const {HingeChallenge}=require('../web/hinge-challenge.js');
 const script=fs.readFileSync(require('node:path').join(__dirname,'../web/app.js'),'utf8');
 function fixture(options={}){
  let clock=1000;const elements=new Map(),listeners={};
- function element(){return {textContent:'',disabled:false,hidden:false,open:false,style:{},append(){},scrollIntoView(){},focus(){},className:'',value:0};}
- const document={hidden:false,getElementById(id){if(!elements.has(id))elements.set(id,element());return elements.get(id);},createElement:element,addEventListener(type,fn){listeners[type]=fn;}};
+ function element(){const handlers={};return {textContent:'',disabled:false,hidden:false,open:false,style:{},append(){},scrollIntoView(){},focus(){},className:'',value:0,showModalCalls:0,closeCalls:0,addEventListener(type,fn){handlers[type]=fn;},showModal(){this.open=true;this.showModalCalls++;},close(){this.open=false;this.closeCalls++;handlers.close?.();}};}
+ const document={hidden:false,getElementById(id){if(!elements.has(id)){const value=element();if(id==='compatibility-dialog'&&options.dialogSupported===false)delete value.showModal;elements.set(id,value);}return elements.get(id);},createElement:element,addEventListener(type,fn){listeners[type]=fn;}};
  class ClockDate extends Date {constructor(...args){super(...(args.length?args:[clock]));}static now(){return clock;}}
- const context=vm.createContext({document,Date:ClockDate,HingeChallenge,performance:{now:()=>clock},navigator:options.navigator||{},location:options.location||{hostname:'127.0.0.1',protocol:'http:'},isSecureContext:options.isSecureContext??true,fetch:options.fetch||(()=>{throw new Error('Unexpected network request in offline test');}),AbortController,TextDecoder,window:{addEventListener(){}},requestAnimationFrame:()=>1,setInterval:()=>1,crypto:{getRandomValues(a){a[0]=0;return a;}}});
+ const stored=new Map(),sessionStorage=options.sessionStorage||{getItem:key=>stored.get(key)??null,setItem:(key,value)=>stored.set(key,String(value))};
+ const context=vm.createContext({document,Date:ClockDate,HingeChallenge,performance:{now:()=>clock},navigator:options.navigator||{},location:options.location||{hostname:'127.0.0.1',protocol:'http:'},isSecureContext:options.isSecureContext??true,sessionStorage,fetch:options.fetch||(()=>{throw new Error('Unexpected network request in offline test');}),AbortController,TextDecoder,window:{addEventListener(){}},requestAnimationFrame:()=>1,setInterval:()=>1,crypto:{getRandomValues(a){a[0]=0;return a;}}});
  vm.runInContext(script,context);
  return {context,document,setTime(value){clock=value;},run(code){return vm.runInContext(code,context);},hidden(value){document.hidden=value;listeners.visibilitychange();}};
 }
@@ -90,4 +91,43 @@ test('loopback native mode still requests its session and authenticated sensor s
  assert.deepEqual(requests.map(request=>request.path),['/session','/sensor']);
  assert.equal(requests[1].options.headers['X-Hinge-Key'],'offline-test-token');
  assert.match(f.document.getElementById('status').textContent,/Native stream ended/);
+});
+
+test('unsupported hosted browser opens a modal and dismissal persists for the session',()=>{
+ const location={hostname:'hinge-demo.example',protocol:'https:'},stored=new Map();
+ const sessionStorage={getItem:key=>stored.get(key)??null,setItem:(key,value)=>stored.set(key,value)};
+ const first=fixture({location,sessionStorage}),dialog=first.document.getElementById('compatibility-dialog');
+ assert.equal(dialog.open,true);assert.equal(dialog.showModalCalls,1);
+ assert.equal(stored.has('hinge-browser-notice-dismissed'),false,'opening is not acknowledgment');
+ first.document.getElementById('compatibility-dismiss').onclick();
+ assert.equal(dialog.open,false);assert.equal(dialog.closeCalls,1);
+ assert.equal(stored.get('hinge-browser-notice-dismissed'),'1');
+ const revisit=fixture({location,sessionStorage});
+ assert.equal(revisit.document.getElementById('compatibility-dialog').showModalCalls,0);
+});
+
+test('native dialog close also acknowledges Escape dismissal',()=>{
+ const f=fixture({location:{hostname:'hinge-demo.example',protocol:'https:'}});
+ f.document.getElementById('compatibility-dialog').close();
+ assert.equal(f.context.sessionStorage.getItem('hinge-browser-notice-dismissed'),'1');
+});
+
+test('supported browser and local native page do not open the compatibility modal',()=>{
+ const hid={getDevices:async()=>[],requestDevice:async()=>[],addEventListener(){}};
+ for(const options of [{}, {location:{hostname:'hinge-demo.example',protocol:'https:'},navigator:{hid}}, {location:{hostname:'hinge-demo.example',protocol:'http:'},isSecureContext:false}]){
+  const f=fixture(options);
+  assert.equal(f.document.getElementById('compatibility-dialog').showModalCalls,0);
+ }
+});
+
+test('blocked storage and missing dialog support do not break the page',()=>{
+ const location={hostname:'hinge-demo.example',protocol:'https:'};
+ const f=fixture({location,sessionStorage:{getItem(){throw new Error('Storage blocked');},setItem(){throw new Error('Storage blocked');}}});
+ assert.equal(f.document.getElementById('compatibility-dialog').open,true);
+ assert.doesNotThrow(()=>f.document.getElementById('compatibility-dismiss').onclick());
+ assert.equal(f.document.getElementById('compatibility-dialog').open,false);
+ assert.match(f.document.getElementById('status').textContent,/does not support WebHID/);
+ const legacy=fixture({location,dialogSupported:false});
+ assert.equal(legacy.document.getElementById('compatibility-dialog').showModalCalls,0);
+ assert.equal(legacy.document.getElementById('native').disabled,false);
 });
