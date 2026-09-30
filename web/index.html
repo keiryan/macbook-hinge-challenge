@@ -6,7 +6,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="theme-color" content="#0b1018">
 <script src="appearance.js"></script>
-<title>Hinge — a live angle instrument</title>
+<title>Hinge: MacBook lid angle reader</title>
 <style>
 :root{color-scheme:dark;--paper:#0b1018;--ink:#e6edf6;--muted:#99aabe;--line:#a3b8d129;--accent:#73d9ef;--surface:#121b29;--soft:#1a2638;--button-bg:#96e3f2;--button-ink:#102735;--button-hover:#b7eef9;--shadow:#0006;--track:#2b3b50;--band:#3c7286;--overlay:#030813aa;--warning-bg:#ff678d0d;--warning-line:#ff78933d;--warning-ink:#ffadbd;--lid-light-strong:#62d6f033;--lid-light-soft:#6f6ce712;--lid-edge:#9be8f8;--lid-edge-faint:#9be8f82b;--lid-edge-glow:#73d9efa0;--lid-tick:#a3b8d11f;--lid-tick-lit:#8fe3f566;--lid-hinge-halo:#73d9ef1f;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-synthesis:none}
 :root[data-theme="light"]{color-scheme:light;--paper:#eef3f8;--ink:#18283f;--muted:#52677e;--line:#3854722e;--accent:#086d8a;--surface:#f9fcff;--soft:#e2ebf4;--button-bg:#142c44;--button-ink:#f4fbff;--button-hover:#265474;--shadow:#10283b18;--track:#ccdae8;--band:#9cc8da;--overlay:#15263a60;--warning-bg:#fff2f5;--warning-line:#edb0c0;--warning-ink:#96304e;--lid-light-strong:#1f8fbf29;--lid-light-soft:#7a7fe20e;--lid-edge:#0b7a9b;--lid-edge-faint:#0b7a9b26;--lid-edge-glow:#1b8fb870;--lid-tick:#3854721c;--lid-tick-lit:#0b7a9b5c;--lid-hinge-halo:#0b7a9b1a}
@@ -78,7 +78,7 @@ body[data-view="challenge"] .challenge-stage{padding-top:105px}
 </style>
 </head>
 <body data-view="live" data-challenge-state="idle">
-<noscript><p class="noscript">This instrument needs JavaScript to connect to the lid sensor. <a href="https://github.com/keiryan/macbook-hinge-challenge">Read the setup instructions on GitHub.</a></p></noscript>
+<noscript><p class="noscript">This page needs JavaScript to read the lid sensor. <a href="https://github.com/keiryan/macbook-hinge-challenge">Read the setup instructions on GitHub.</a></p></noscript>
 <div id="angle-atmosphere" aria-hidden="true"><div class="lid">
 <svg class="lid-scale" viewBox="-100 -100 200 100" preserveAspectRatio="none"><path id="lid-ticks" d="M94.5 0L100 0M97.13 -8.5L99.62 -8.72M96.02 -16.93L98.48 -17.36M94.18 -25.23L96.59 -25.88M91.62 -33.35L93.97 -34.2M88.37 -41.21L90.63 -42.26M81.84 -47.25L86.6 -50M79.87 -55.92L81.92 -57.36M74.69 -62.67L76.6 -64.28M68.94 -68.94L70.71 -70.71M62.67 -74.69L64.28 -76.6M55.92 -79.87L57.36 -81.92M47.25 -81.84L50 -86.6M41.21 -88.37L42.26 -90.63M33.35 -91.62L34.2 -93.97M25.23 -94.18L25.88 -96.59M16.93 -96.02L17.36 -98.48M8.5 -97.13L8.72 -99.62M0 -94.5L0 -100M-8.5 -97.13L-8.72 -99.62M-16.93 -96.02L-17.36 -98.48M-25.23 -94.18L-25.88 -96.59M-33.35 -91.62L-34.2 -93.97M-41.21 -88.37L-42.26 -90.63M-47.25 -81.84L-50 -86.6M-55.92 -79.87L-57.36 -81.92M-62.67 -74.69L-64.28 -76.6M-68.94 -68.94L-70.71 -70.71M-74.69 -62.67L-76.6 -64.28M-79.87 -55.92L-81.92 -57.36M-81.84 -47.25L-86.6 -50M-88.37 -41.21L-90.63 -42.26M-91.62 -33.35L-93.97 -34.2M-94.18 -25.23L-96.59 -25.88M-96.02 -16.93L-98.48 -17.36M-97.13 -8.5L-99.62 -8.72M-94.5 0L-100 0" vector-effect="non-scaling-stroke"/></svg>
 <div class="sensor-visual"><div class="lid-light"></div><svg class="lid-scale-lit" viewBox="-100 -100 200 100" preserveAspectRatio="none"><use href="#lid-ticks"/></svg><div class="lid-base"></div><div class="lid-edge"></div><div class="lid-hinge"></div></div>
@@ -123,8 +123,8 @@ body[data-view="challenge"] .challenge-stage{padding-top:105px}
 <div class="stage-action"><button id="open-connect" class="primary">Connect your MacBook</button></div>
 </section>
 <section id="challenge-view" class="stage challenge-stage" aria-label="Hinge challenge" hidden>
-<h1 class="eyebrow stage-label">Three points. One moving screen.</h1>
-<p id="target">Meet the angle.</p>
+<h1 class="eyebrow stage-label">Hit three target angles</h1>
+<p id="target">Ready to start.</p>
 <p id="challenge-status" role="status">Connect a sensor and receive a fresh angle to begin.</p>
 <p class="challenge-live">Your angle<span id="challenge-angle">—</span></p>
 <div class="challenge-progress"><progress class="visually-hidden" id="hold" max="1" value="0" aria-label="Time spanned by matching received reports"></progress><p id="challenge-meta">For the best experience, open your browser in full screen.</p></div>
@@ -144,12 +144,12 @@ body[data-view="challenge"] .challenge-stage{padding-top:105px}
 <div><dt>Native timing</dt><dd id="native-timing">—</dd></div>
 </dl>
 </section>
-<footer class="instrument-footer"><span class="footer-index">MacBook lid instrument · 01</span><span>Readings stay on your Mac.</span></footer>
+<footer class="instrument-footer"><span class="footer-index">MacBook lid angle reader</span><span>Readings stay on your Mac.</span></footer>
 </div>
 
 <dialog id="compatibility-dialog" aria-labelledby="compatibility-title" aria-describedby="compatibility-description">
 <div class="dialog-top"><span class="eyebrow muted">Welcome to hinge</span><button id="compatibility-close" class="close-button" aria-label="Close welcome guide" autofocus></button></div>
-<h2 id="compatibility-title">Your screen, in degrees.</h2>
+<h2 id="compatibility-title">MacBook lid angle reader</h2>
 <p id="compatibility-description" class="dialog-intro">Read your MacBook’s lid angle as you move the screen. For a little challenge, find three random angles from the menu.</p>
 <p class="fullscreen-tip"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 3H3v4m10-4h4v4M3 13v4h4m10-4v4h-4"/></svg>For the best experience, open your browser in full screen.</p>
 <div id="safari-notice" class="safari-notice">
@@ -166,13 +166,13 @@ body[data-view="challenge"] .challenge-stage{padding-top:105px}
 <p id="browser-notice" class="browser-message" hidden></p>
 <div class="welcome-options">
 <div><h3>Open in the browser</h3><p>Use desktop Chrome or Edge with a compatible MacBook. Choose the lid sensor when asked. No download needed.</p></div>
-<div><h3>Go native for smoother motion</h3><p>Run the local helper on your Mac. Requires Python 3 and Apple’s Swift compiler. Works with Safari, too.</p></div>
+<div><h3>Run the native reader</h3><p>Run the local helper on your Mac. Requires Python 3 and Apple’s Swift compiler. Works with Safari, too.</p></div>
 </div>
 <div class="speed-note"><span class="speed-number">50×</span><p>More frequent readings in native mode on the tested Mac: about 50 reads/sec versus one browser report/sec. Rates vary; this compares read frequency, not measured latency.</p></div>
 <p class="dialog-fineprint">Requires a compatible MacBook with a readable lid-angle sensor. Check your model in the compatibility guide below.</p>
 <div class="dialog-links"><a href="https://github.com/keiryan/macbook-hinge-challenge#compatibility" target="_blank" rel="noreferrer">Compatibility &amp; evidence</a><a href="https://github.com/keiryan/macbook-hinge-challenge#run-locally" target="_blank" rel="noreferrer">Native setup</a></div>
 <p class="dialog-fineprint">Move within the screen’s normal range. The challenge is a local experiment, not secure proof that a human is present.</p>
-<div class="dialog-bottom"><p>You can reopen this guide from Menu → About &amp; setup.</p><button id="compatibility-dismiss" class="primary">Open the instrument</button></div>
+<div class="dialog-bottom"><p>You can reopen this guide from Menu → About &amp; setup.</p><button id="compatibility-dismiss" class="primary">Continue</button></div>
 </dialog>
 
 <dialog id="connection-dialog" aria-labelledby="connection-title">
@@ -192,8 +192,8 @@ body[data-view="challenge"] .challenge-stage{padding-top:105px}
 </dialog>
 
 <dialog id="diagnostics-dialog" class="diagnostics-dialog" aria-labelledby="diagnostics-title">
-<div class="dialog-top"><span class="eyebrow muted">Under the surface</span><button id="diagnostics-close" class="close-button" aria-label="Close diagnostics"></button></div>
-<h2 id="diagnostics-title">Every received reading.</h2>
+<div class="dialog-top"><span class="eyebrow muted">Diagnostics</span><button id="diagnostics-close" class="close-button" aria-label="Close diagnostics"></button></div>
+<h2 id="diagnostics-title">Received readings</h2>
 <p id="native-note">Read frequency and hardware update frequency are different. The display does not smooth or invent angles.</p>
 <p class="small">Browser arrival and native read-completion times are separate; neither is a hardware capture timestamp. Native reads delayed more than 150 ms are discarded. Native mode requests up to 60 reads/s; repeated values may reflect the same sensor measurement.</p>
 <div class="table-scroll"><table><thead><tr><th>Browser arrival</th><th>Arrival gap</th><th>Native read completed</th><th>Bridge delay</th><th>Source</th><th>Bytes</th><th>Angle</th></tr></thead><tbody id="rows"></tbody></table></div>
