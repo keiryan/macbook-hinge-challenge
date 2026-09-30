@@ -38,21 +38,30 @@
     syncTheme();
   }
 
+  // The lid sweeps open from closed when readings resume after a real pause.
+  // Brief freshness gaps (common in browser mode) resume without replaying it.
+  const entranceAfterMs = 2000;
+  let inactiveSince = null;
+
   function update(angle) {
     if (!Number.isInteger(angle) || angle < 0 || angle > 360) return false;
-    // Only the decorative plane clamps at 180°. The app's sensor readout
+    // Only the decorative lid clamps at 180°. The app's sensor readout
     // continues to display the actual accepted angle without interpolation.
     const bounded = Math.min(180, angle);
-    root.style.setProperty('--horizon-y', Number((82 - bounded / 180 * 64).toFixed(3)) + '%');
-    root.style.setProperty('--horizon-tilt', Number(((90 - bounded) * 0.22).toFixed(3)) + 'deg');
+    if (root.dataset.sensorVisual !== 'active' && (inactiveSince === null || Date.now() - inactiveSince >= entranceAfterMs)) {
+      root.dataset.lidEntrance = 'play';
+    }
+    root.style.setProperty('--lid-angle', bounded + 'deg');
     root.dataset.sensorVisual = 'active';
     return true;
   }
 
+  // Leaves the last angle in place so the lid fades out where it stood
+  // instead of swinging back to a neutral position.
   function clear() {
+    if (root.dataset.sensorVisual === 'active') inactiveSince = Date.now();
     root.dataset.sensorVisual = 'inactive';
-    root.style.setProperty('--horizon-y', '50%');
-    root.style.setProperty('--horizon-tilt', '0deg');
+    delete root.dataset.lidEntrance;
   }
 
   // Loaded synchronously in <head> so the selected palette exists before

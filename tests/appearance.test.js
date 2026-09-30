@@ -17,9 +17,10 @@ function fixture(options = {}) {
   const root = { dataset: {}, style: { setProperty: (name, value) => properties.set(name, value) } };
   const document = { documentElement: root, querySelector: () => meta, getElementById: id => elements.get(id) || null };
   const localStorage = options.storage || { getItem: key => stored.get(key) ?? null, setItem: (key, value) => stored.set(key, value) };
-  const context = vm.createContext({ window: {}, document, localStorage });
+  const clock = { now: options.now ?? 0 };
+  const context = vm.createContext({ window: {}, document, localStorage, Date: { now: () => clock.now } });
   vm.runInContext(script, context);
-  return { root, meta, properties, stored, api: context.window.HingeAppearance, controls() {
+  return { root, meta, properties, stored, clock, api: context.window.HingeAppearance, controls() {
     for (const id of ['theme-toggle', 'theme-dark', 'theme-light']) elements.set(id, element());
     context.window.HingeAppearance.setup();
     return Object.fromEntries(elements);
@@ -60,23 +61,41 @@ test('blocked theme storage does not prevent initialization or user choice', () 
   assert.equal(f.root.dataset.theme, 'light');
 });
 
-test('accepted sensor angles map to the horizon while geometry alone clamps above 180 degrees', () => {
+test('accepted sensor angles set the lid angle while geometry alone clamps above 180 degrees', () => {
   const f = fixture();
-  for (const [angle, y, tilt] of [[0, '82%', '19.8deg'], [90, '50%', '0deg'], [180, '18%', '-19.8deg'], [270, '18%', '-19.8deg'], [360, '18%', '-19.8deg']]) {
+  for (const [angle, lid] of [[0, '0deg'], [90, '90deg'], [180, '180deg'], [270, '180deg'], [360, '180deg']]) {
     assert.equal(f.api.update(angle), true);
     assert.equal(f.root.dataset.sensorVisual, 'active');
-    assert.equal(f.properties.get('--horizon-y'), y);
-    assert.equal(f.properties.get('--horizon-tilt'), tilt);
+    assert.equal(f.properties.get('--lid-angle'), lid);
   }
 });
 
-test('invalid values cannot activate the sensor decoration and clear restores neutral geometry', () => {
+test('invalid values cannot activate the sensor decoration and clear fades the lid out where it stood', () => {
   const f = fixture();
   for (const invalid of [NaN, Infinity, -1, 361, 89.5, '90', null]) assert.equal(f.api.update(invalid), false);
   assert.equal(f.root.dataset.sensorVisual, 'inactive');
+  assert.equal(f.properties.has('--lid-angle'), false);
   f.api.update(120);
   f.api.clear();
   assert.equal(f.root.dataset.sensorVisual, 'inactive');
-  assert.equal(f.properties.get('--horizon-y'), '50%');
-  assert.equal(f.properties.get('--horizon-tilt'), '0deg');
+  assert.equal(f.properties.get('--lid-angle'), '120deg');
+});
+
+test('the lid opening plays on first reading and after a real pause, not after brief freshness gaps', () => {
+  const f = fixture({ now: 1000 });
+  f.api.update(100);
+  assert.equal(f.root.dataset.lidEntrance, 'play');
+  f.api.update(104);
+  assert.equal(f.root.dataset.lidEntrance, 'play', 'continuous readings do not restart it');
+  f.api.clear();
+  assert.equal(f.root.dataset.lidEntrance, undefined);
+  f.clock.now = 2500;
+  f.api.clear();
+  f.api.update(106);
+  assert.equal(f.root.dataset.lidEntrance, undefined, 'a 1.5 s gap resumes in place');
+  f.api.clear();
+  f.clock.now = 4500;
+  f.api.clear();
+  f.api.update(108);
+  assert.equal(f.root.dataset.lidEntrance, 'play', 'a 2 s pause replays the opening');
 });
