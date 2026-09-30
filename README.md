@@ -4,6 +4,8 @@ A live MacBook lid-angle reader and a small physical-interaction experiment: mov
 
 The demo supports direct browser access through WebHID and an optional Swift helper for more frequent reads. All readings stay on the Mac. No third-party runtime packages or accounts are required.
 
+The instrument fills the browser window with the live angle. Once connected, arrival rates, timing, and raw readings appear along the bottom. Open **Menu** for the full-screen **Hinge challenge**, sensor connections, and diagnostics. The welcome guide appears once per tab session and can always be reopened through **Menu → About & setup**.
+
 > **For smoother tracking, use native mode.** On the tested Mac, native mode delivered about **50 sensor reads per second**, compared with about **one browser report per second**: roughly **50× more frequent readings**. [Run the native reader locally](#run-locally). These are observed read rates; results vary by Mac. See [what to expect](#what-to-expect) for the measurement limits.
 
 ## Compatibility
@@ -59,7 +61,7 @@ cd macbook-hinge-challenge
 ./scripts/run.sh
 ```
 
-Open **http://127.0.0.1:8768/** in your browser and choose **Use native reader**. The helper opens the sensor only when that button is selected. Stop the server with Control-C.
+Open **http://127.0.0.1:8768/** in your browser, dismiss the welcome guide, and choose **Connect your MacBook → Use native reader**. The helper opens the sensor only when that button is selected. Stop the server with Control-C.
 
 For direct WebHID without compiling the native helper:
 
@@ -67,7 +69,7 @@ For direct WebHID without compiling the native helper:
 ./scripts/run.sh --browser-only
 ```
 
-Open the same URL in a browser with WebHID support, such as desktop Chrome or Edge, choose **Connect browser sensor**, and grant access to the lid sensor. If WebHID is unavailable, a modern browser can instead use the locally served native bridge.
+Open the same URL in a browser with WebHID support, such as desktop Chrome or Edge, choose **Connect your MacBook → Connect browser sensor**, and grant access to the lid sensor. If WebHID is unavailable, a modern browser can instead use the locally served native bridge.
 
 Use `--port 8770` if the default port is occupied. The server accepts loopback connections only.
 
@@ -86,7 +88,7 @@ This uses an undocumented, model-dependent sensor interface. A MacBook may lack 
 
 Start after a fresh reading arrives. Three targets between 65° and 110° are generated using browser cryptographic randomness, each at least 12° from the preceding angle. Each step needs received readings within ±3° spanning at least 500 ms. There is a 60-second limit.
 
-The demo rejects stale native packets, resets interrupted holds, and stops a challenge when the page is hidden or the sensor connection changes. It requires reports received after the current prompt. Offline tests cover these rules; a complete three-target physical challenge has **not** been verified.
+The demo rejects stale native packets, resets interrupted holds, and stops a challenge when the page is hidden, the sensor connection changes, you leave the challenge view, or you open a dialog. It requires reports received after the current prompt. Offline tests cover these rules; a complete three-target physical challenge has **not** been verified.
 
 This is an experiment in adding a physical obstacle for agents limited to ordinary browser interaction. **It is not a secure CAPTCHA or remote proof of human presence.** A client controlled by an attacker can modify JavaScript or outgoing claims. Neither WebHID nor this native helper produces a cryptographically signed hinge measurement. The local session token protects access to the bridge; it does not attest the sensor or prove a human moved it. See [design and boundaries](docs/architecture.md).
 

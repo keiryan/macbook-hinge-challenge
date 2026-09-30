@@ -6,13 +6,13 @@ const {HingeChallenge}=require('../web/hinge-challenge.js');
 const script=fs.readFileSync(require('node:path').join(__dirname,'../web/app.js'),'utf8');
 function fixture(options={}){
  let clock=1000;const elements=new Map(),listeners={};
- function element(){const handlers={};return {textContent:'',disabled:false,hidden:false,open:false,style:{},append(){},scrollIntoView(){},focus(){},className:'',value:0,showModalCalls:0,closeCalls:0,addEventListener(type,fn){handlers[type]=fn;},showModal(){this.open=true;this.showModalCalls++;},close(){this.open=false;this.closeCalls++;handlers.close?.();}};}
- const document={hidden:false,getElementById(id){if(!elements.has(id)){const value=element();if(id==='compatibility-dialog'&&options.dialogSupported===false)delete value.showModal;elements.set(id,value);}return elements.get(id);},createElement:element,addEventListener(type,fn){listeners[type]=fn;}};
+ function element(){const handlers={},attributes={};return {textContent:'',disabled:false,hidden:false,open:false,style:{},dataset:{},append(){},scrollIntoView(){},focus(){document.activeElement=this;},contains(target){return target===this;},setAttribute(name,value){attributes[name]=String(value);},getAttribute(name){return attributes[name]??null;},removeAttribute(name){delete attributes[name];},className:'',value:0,showModalCalls:0,closeCalls:0,addEventListener(type,fn){handlers[type]=fn;},showModal(){this.open=true;this.showModalCalls++;},close(){this.open=false;this.closeCalls++;handlers.close?.();}};}
+ const document={hidden:false,body:{dataset:{}},activeElement:null,getElementById(id){if(!elements.has(id)){const value=element();if(id.endsWith('-dialog')&&options.dialogSupported===false)delete value.showModal;elements.set(id,value);}return elements.get(id);},createElement:element,addEventListener(type,fn){listeners[type]=fn;}};
  class ClockDate extends Date {constructor(...args){super(...(args.length?args:[clock]));}static now(){return clock;}}
  const stored=new Map(),sessionStorage=options.sessionStorage||{getItem:key=>stored.get(key)??null,setItem:(key,value)=>stored.set(key,String(value))};
  const context=vm.createContext({document,Date:ClockDate,HingeChallenge,performance:{now:()=>clock},navigator:options.navigator||{},location:options.location||{hostname:'127.0.0.1',protocol:'http:'},isSecureContext:options.isSecureContext??true,sessionStorage,fetch:options.fetch||(()=>{throw new Error('Unexpected network request in offline test');}),AbortController,TextDecoder,window:{addEventListener(){}},requestAnimationFrame:()=>1,setInterval:()=>1,crypto:{getRandomValues(a){a[0]=0;return a;}}});
  vm.runInContext(script,context);
- return {context,document,setTime(value){clock=value;},run(code){return vm.runInContext(code,context);},hidden(value){document.hidden=value;listeners.visibilitychange();}};
+ return {context,document,setTime(value){clock=value;},run(code){return vm.runInContext(code,context);},hidden(value){document.hidden=value;listeners.visibilitychange();},event(type,event){listeners[type]?.(event);}};
 }
 const packet=(overrides={})=>({sequence:1,readCompletedMonoMs:900,readCompletedEpochMs:990,readMs:1,angle:75,raw:[1,75,0],reportId:1,...overrides});
 function deliver(f,item){f.context.packet=item;f.run('receiveNative(packet)');}
@@ -56,11 +56,12 @@ test('hosted native button shows local setup and never fetches native endpoints'
  const requests=[];
  const f=fixture({location:{hostname:'hinge-demo.example',protocol:'https:'},fetch:async path=>{requests.push(path);throw new Error('No hosted native endpoint');}});
  assert.equal(f.document.getElementById('native').textContent,'Set up native reader');
- assert.equal(f.document.getElementById('local-setup').hidden,false);
+ assert.equal(f.document.getElementById('local-setup').hidden,true);
  await f.document.getElementById('native').onclick();
  await f.run('nativeConnect()');
  assert.deepEqual(requests,[]);
- assert.equal(f.document.getElementById('local-setup').open,true);
+ assert.equal(f.document.getElementById('local-setup').hidden,false);
+ assert.equal(f.document.getElementById('connection-dialog').open,true);
  assert.match(f.document.getElementById('status').textContent,/runs on your Mac/);
 });
 
@@ -87,36 +88,45 @@ test('loopback native mode still requests its session and authenticated sensor s
  }});
  assert.equal(f.document.getElementById('local-setup').hidden,true);
  assert.equal(f.document.getElementById('native').textContent,'Use native reader');
+ f.document.getElementById('compatibility-dismiss').onclick();
+ f.document.getElementById('open-connect').onclick();
+ assert.equal(f.document.getElementById('connection-dialog').open,true);
  await f.document.getElementById('native').onclick();
  assert.deepEqual(requests.map(request=>request.path),['/session','/sensor']);
  assert.equal(requests[1].options.headers['X-Hinge-Key'],'offline-test-token');
+ assert.equal(f.document.getElementById('connection-dialog').open,true,'an ended stream exposes its status in the dialog');
  assert.match(f.document.getElementById('status').textContent,/Native stream ended/);
 });
 
-test('unsupported hosted browser opens a modal and dismissal persists for the session',()=>{
+test('welcome dismissal persists for the session and About can reopen it',()=>{
  const location={hostname:'hinge-demo.example',protocol:'https:'},stored=new Map();
  const sessionStorage={getItem:key=>stored.get(key)??null,setItem:(key,value)=>stored.set(key,value)};
  const first=fixture({location,sessionStorage}),dialog=first.document.getElementById('compatibility-dialog');
  assert.equal(dialog.open,true);assert.equal(dialog.showModalCalls,1);
- assert.equal(stored.has('hinge-browser-notice-dismissed'),false,'opening is not acknowledgment');
+ assert.equal(stored.has('hinge-welcome-dismissed-v1'),false,'opening is not acknowledgment');
  first.document.getElementById('compatibility-dismiss').onclick();
  assert.equal(dialog.open,false);assert.equal(dialog.closeCalls,1);
- assert.equal(stored.get('hinge-browser-notice-dismissed'),'1');
+ assert.equal(stored.get('hinge-welcome-dismissed-v1'),'1');
  const revisit=fixture({location,sessionStorage});
  assert.equal(revisit.document.getElementById('compatibility-dialog').showModalCalls,0);
+ revisit.document.getElementById('menu-about').onclick();
+ assert.equal(revisit.document.getElementById('compatibility-dialog').open,true);
+ revisit.document.getElementById('compatibility-close').onclick();
+ assert.equal(revisit.document.getElementById('compatibility-dialog').open,false);
 });
 
 test('native dialog close also acknowledges Escape dismissal',()=>{
  const f=fixture({location:{hostname:'hinge-demo.example',protocol:'https:'}});
  f.document.getElementById('compatibility-dialog').close();
- assert.equal(f.context.sessionStorage.getItem('hinge-browser-notice-dismissed'),'1');
+ assert.equal(f.context.sessionStorage.getItem('hinge-welcome-dismissed-v1'),'1');
 });
 
-test('supported browser and local native page do not open the compatibility modal',()=>{
+test('welcome opens on first visit for all browsers and shows compatibility only when needed',()=>{
  const hid={getDevices:async()=>[],requestDevice:async()=>[],addEventListener(){}};
  for(const options of [{}, {location:{hostname:'hinge-demo.example',protocol:'https:'},navigator:{hid}}, {location:{hostname:'hinge-demo.example',protocol:'http:'},isSecureContext:false}]){
   const f=fixture(options);
-  assert.equal(f.document.getElementById('compatibility-dialog').showModalCalls,0);
+  assert.equal(f.document.getElementById('compatibility-dialog').showModalCalls,1);
+  assert.equal(f.document.getElementById('browser-notice').hidden,!!options.navigator?.hid&&options.isSecureContext!==false);
  }
 });
 
@@ -130,4 +140,112 @@ test('blocked storage and missing dialog support do not break the page',()=>{
  const legacy=fixture({location,dialogSupported:false});
  assert.equal(legacy.document.getElementById('compatibility-dialog').showModalCalls,0);
  assert.equal(legacy.document.getElementById('native').disabled,false);
+});
+
+test('view navigation isolates screens and leaving an active challenge aborts it',()=>{
+ const f=fixture();f.document.getElementById('compatibility-dismiss').onclick();
+ assert.equal(f.document.body.dataset.view,'live');
+ assert.equal(f.document.getElementById('live-view').hidden,false);
+ assert.equal(f.document.getElementById('challenge-view').hidden,true);
+ assert.equal(f.document.getElementById('menu-live').getAttribute('aria-current'),'page');
+ assert.equal(f.document.getElementById('menu-challenge').getAttribute('aria-current'),null);
+ f.document.getElementById('menu-challenge').onclick();
+ assert.equal(f.document.body.dataset.view,'challenge');
+ assert.equal(f.document.getElementById('live-view').hidden,true);
+ assert.equal(f.document.getElementById('challenge-view').hidden,false);
+ assert.equal(f.document.getElementById('menu-live').getAttribute('aria-current'),null);
+ assert.equal(f.document.getElementById('menu-challenge').getAttribute('aria-current'),'page');
+ f.run('challenge=new HingeChallenge({targets:[75],startedAt:1000});challenge.update(75,1000);render();');
+ assert.equal(f.document.body.dataset.challengeState,'active');
+ const back=f.document.getElementById('back-live');back.parentElement=f.document.getElementById('challenge-view');back.focus();back.onclick();
+ assert.equal(f.run('challenge.getState(1000).status'),'aborted');
+ assert.equal(f.document.body.dataset.challengeState,'aborted');
+ assert.equal(f.document.getElementById('view-name').textContent,'Live angle');
+ assert.equal(f.document.activeElement,f.document.getElementById('menu-toggle'));
+});
+
+test('menu does not interrupt a challenge, but all dialogs do and restore focus',()=>{
+ for(const [button,dialog,close] of [['menu-connect','connection-dialog','connection-close'],['menu-about','compatibility-dialog','compatibility-dismiss'],['menu-diagnostics','diagnostics-dialog','diagnostics-close']]){
+  const f=fixture();f.document.getElementById('compatibility-dismiss').onclick();
+  f.run('setView("challenge");challenge=new HingeChallenge({targets:[75],startedAt:1000});');
+  f.document.getElementById('menu-toggle').onclick();
+  assert.equal(f.run('challenge.getState(1000).status'),'active');
+  assert.equal(f.document.getElementById('menu-toggle').getAttribute('aria-expanded'),'true');
+  f.document.getElementById(button).onclick();
+  assert.equal(f.run('challenge.getState(1000).status'),'aborted');
+  assert.equal(f.document.getElementById(dialog).open,true);
+  assert.equal(f.document.getElementById('menu-panel').hidden,true);
+  f.document.getElementById(close).onclick();
+  assert.equal(f.document.getElementById(dialog).open,false);
+  assert.equal(f.document.activeElement,f.document.getElementById('menu-toggle'));
+ }
+});
+
+test('outside click and Escape close the menu and restore its toggle focus',()=>{
+ const f=fixture();f.document.getElementById('compatibility-dismiss').onclick();
+ f.document.getElementById('menu-toggle').onclick();
+ f.event('click',{target:f.document.getElementById('live-view')});
+ assert.equal(f.document.getElementById('menu-panel').hidden,true);
+ assert.equal(f.document.activeElement,f.document.getElementById('menu-toggle'));
+ f.document.getElementById('menu-toggle').onclick();let prevented=false;
+ f.event('keydown',{key:'Escape',preventDefault(){prevented=true;}});
+ assert.equal(prevented,true);
+ assert.equal(f.document.getElementById('menu-toggle').getAttribute('aria-expanded'),'false');
+});
+
+test('connection state and both angle views track real accepted reports and reset together',()=>{
+ const f=fixture();f.document.getElementById('compatibility-dismiss').onclick();
+ assert.equal(f.document.getElementById('telemetry').hidden,true);
+ assert.equal(f.document.getElementById('connection-state').dataset.connected,'false');
+ f.run('source="native";visibleSinceEpochMs=0;');
+ f.setTime(1020);deliver(f,packet({readCompletedEpochMs:1010}));f.run('render()');
+ assert.equal(f.document.getElementById('angle').textContent,'75');
+ assert.equal(f.document.getElementById('challenge-angle').textContent,'75');
+ assert.equal(f.document.getElementById('connection-state').textContent,'Native connected');
+ assert.equal(f.document.getElementById('connection-state').dataset.connected,'true');
+ assert.match(f.document.getElementById('connection-state').getAttribute('aria-label'),/^Native connected\./);
+ assert.equal(f.document.getElementById('telemetry').hidden,false);
+ assert.equal(f.document.getElementById('open-connect').hidden,true);
+ f.hidden(true);
+ assert.equal(f.document.getElementById('angle').textContent,'—');
+ assert.equal(f.document.getElementById('challenge-angle').textContent,'—');
+});
+
+test('native helper startup error keeps the connection dialog and failure message visible',async()=>{
+ const bytes=new TextEncoder().encode(JSON.stringify({error:'No built-in lid sensor found.'})+'\n');
+ const f=fixture({fetch:async path=>path==='/session'?{ok:true,json:async()=>({token:'offline-test-token',nativeAvailable:true})}:{ok:true,body:{getReader:()=>({read:async()=>({done:false,value:bytes})})}}});
+ f.document.getElementById('compatibility-close').onclick();f.document.getElementById('open-connect').onclick();
+ await f.document.getElementById('native').onclick();
+ assert.equal(f.document.getElementById('connection-dialog').open,true);
+ assert.equal(f.document.getElementById('connection-dialog').closeCalls,0);
+ assert.equal(f.document.getElementById('status').textContent,'No built-in lid sensor found.');
+ assert.equal(f.document.getElementById('connection-state').dataset.connected,'false');
+});
+
+test('native dialog closes only after accepted data and restores a visible connection trigger',async()=>{
+ let reads=0,accepted=false,f;
+ const bytes=new TextEncoder().encode(JSON.stringify(packet({readCompletedEpochMs:1000}))+'\n');
+ f=fixture({fetch:async path=>path==='/session'?{ok:true,json:async()=>({token:'offline-test-token',nativeAvailable:true})}:{ok:true,body:{getReader:()=>({read:async()=>{
+  if(reads++===0){assert.equal(f.document.getElementById('connection-dialog').open,true);return {done:false,value:bytes};}
+  assert.equal(f.document.getElementById('connection-dialog').open,false);
+  assert.equal(f.document.getElementById('angle').textContent,'75');
+  assert.equal(f.document.getElementById('open-connect').hidden,true);
+  assert.equal(f.document.activeElement,f.document.getElementById('connection-state'));
+  accepted=true;return {done:true};
+ }})}}});
+ f.document.getElementById('compatibility-close').onclick();
+ f.document.getElementById('open-connect').focus();f.document.getElementById('open-connect').onclick();
+ await f.document.getElementById('native').onclick();
+ assert.equal(accepted,true);
+});
+
+test('an asynchronous browser connection error reopens its visible status dialog',async()=>{
+ const hid={getDevices:async()=>{throw new Error('Device permission failed');},requestDevice:async()=>[],addEventListener(){}};
+ const f=fixture({navigator:{hid}});f.document.getElementById('compatibility-close').onclick();
+ f.document.getElementById('open-connect').onclick();
+ const connecting=f.document.getElementById('connect').onclick();
+ f.document.getElementById('connection-close').onclick();
+ await connecting;
+ assert.equal(f.document.getElementById('connection-dialog').open,true);
+ assert.match(f.document.getElementById('status').textContent,/Device permission failed/);
 });
