@@ -28,8 +28,10 @@ function nativeFreshness(item,nowEpochMs,previous,minimumEpochMs){
 }
 function buttons(){
  $('connect').disabled=busy||!browserSensorAvailable||source==='browser';$('native').disabled=busy||source==='native';$('stop').disabled=busy||!source;
- $('start').disabled=busy||document.hidden||!source||!latest||reportAge(performance.now())>freshnessLimit()||(challenge&&challenge.getState(performance.now()).status==='active');
- $('cancel').disabled=!challenge||challenge.getState(performance.now()).status!=='active';
+ // Start and Cancel swap: each shows only when it can apply to the current run.
+ const running=!!challenge&&challenge.getState(performance.now()).status==='active';
+ $('start').hidden=running;$('start').disabled=busy||document.hidden||!source||!latest||reportAge(performance.now())>freshnessLimit()||running;
+ $('cancel').hidden=!running;$('cancel').disabled=!running;
 }
 function resetMeasurements(){latest=null;received=0;arrivals=[];changeTimes=[];recent=[];previousAngle=null;lastGap=null;nativePrevious=null;droppedNative=0;tableDirty=true;$('angle').textContent='—';$('challenge-angle').textContent='—';$('raw').textContent='—';$('count').textContent='0';window.HingeAppearance?.clear();}
 function receive(angle,raw,reportId,readMs,nativeTiming=null,eventAt=null){
@@ -69,7 +71,7 @@ async function stop(reason='Disconnected.'){
  const old=sensor;sensor=null;source=null;awaitingNativeReport=false;aborter?.abort();aborter=null;
  window.HingeAppearance?.clear();
  if(old){old.removeEventListener('inputreport',input);try{if(old.opened)await old.close();}catch(e){log(e.message);}}
- $('status').textContent=reason;$('source-name').textContent='Disconnected · last value retained';buttons();render();
+ $('status').textContent=reason;buttons();render();
 }
 async function browserConnect(){
  if(!browserSensorAvailable){$('status').textContent=browserAvailabilityMessage();return;}
@@ -82,7 +84,7 @@ async function browserConnect(){
   if(candidate.vendorId!==filter.vendorId||candidate.productId!==filter.productId||!flatten(candidate.collections).some(c=>c.usagePage===filter.usagePage&&c.usage===filter.usage))throw new Error('The selected device is not the expected lid sensor.');
   if(run!==generation)return;
   resetMeasurements();sensor=candidate;source='browser';sensor.addEventListener('inputreport',input);await sensor.open();
-  $('device').textContent=(sensor.productName||'Apple lid sensor')+' · 05ac:8104';$('source-name').textContent='Direct browser · WebHID';$('status').textContent='Browser sensor connected. Move your lid to see the reporting cadence.';
+  $('device').textContent=(sensor.productName||'Apple lid sensor')+' · 05ac:8104';$('status').textContent='Browser sensor connected. Move your lid to see the reporting cadence.';
   $('diagnostic').textContent=JSON.stringify(sensor.collections,null,2)+'\n';
   render();closeDialog('connection-dialog');
  }catch(e){await stop(e.name+': '+e.message);log(e.message);if(e.name!=='AbortError')openDialog('connection-dialog');}finally{busy=false;buttons();}
@@ -97,7 +99,7 @@ async function nativeConnect(){
   const session=await response.json();if(!session.nativeAvailable)throw new Error('Native reader binary is not available.');
   const stream=await fetch('/sensor',{headers:{'X-Hinge-Client':'1','X-Hinge-Key':session.token},signal:controller.signal});if(!stream.ok)throw new Error(await stream.text());
   if(run!==generation)return;
-  resetMeasurements();source='native';awaitingNativeReport=true;$('source-name').textContent='Native feature polling · local bridge';$('device').textContent='Built-in las · 05ac:8104';$('status').textContent='Native reader open. Waiting for the first accepted sensor measurement…';log('Native IOKit Feature Report 1. Requested rate: 60 reads/s.');busy=false;buttons();render();
+  resetMeasurements();source='native';awaitingNativeReport=true;$('device').textContent='Built-in las · 05ac:8104';$('status').textContent='Native reader open. Waiting for the first accepted sensor measurement…';log('Native IOKit Feature Report 1. Requested rate: 60 reads/s.');busy=false;buttons();render();
   const reader=stream.body.getReader(),decoder=new TextDecoder();let pending='';
   while(run===generation){const {value,done}=await reader.read();if(done)break;pending+=decoder.decode(value,{stream:true});let newline;
    while((newline=pending.indexOf('\n'))>=0){const line=pending.slice(0,newline);pending=pending.slice(newline+1);if(!line.trim())continue;const item=JSON.parse(line);if(item.error)throw new Error(item.error);if(run!==generation)break;receiveNative(item);}

@@ -269,3 +269,14 @@ test('appearance follows only accepted reports and resets when data is stale, hi
  before=clears;await f.run('stop()');assert.ok(clears>before);
  assert.deepEqual(updates,[270,90]);
 });
+
+test('Start and Cancel swap: each is shown only while it can apply to the run',()=>{
+ const f=fixture(),start=f.document.getElementById('start'),cancel=f.document.getElementById('cancel');
+ f.run('buttons()');
+ assert.equal(start.hidden,false);assert.equal(cancel.hidden,true,'no run yet, so nothing to cancel');
+ f.run('source="native";challenge=new HingeChallenge({targets:[75,100,80],startedAt:1000});buttons();');
+ assert.equal(start.hidden,true,'a running challenge hides Start');
+ assert.equal(cancel.hidden,false);assert.equal(cancel.disabled,false);
+ f.run('challenge.abort("test");buttons();');
+ assert.equal(start.hidden,false);assert.equal(cancel.hidden,true,'a finished run hides Cancel');
+});
