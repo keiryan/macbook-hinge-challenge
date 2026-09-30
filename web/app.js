@@ -31,13 +31,14 @@ function buttons(){
  $('start').disabled=busy||document.hidden||!source||!latest||reportAge(performance.now())>freshnessLimit()||(challenge&&challenge.getState(performance.now()).status==='active');
  $('cancel').disabled=!challenge||challenge.getState(performance.now()).status!=='active';
 }
-function resetMeasurements(){latest=null;received=0;arrivals=[];changeTimes=[];recent=[];previousAngle=null;lastGap=null;nativePrevious=null;droppedNative=0;tableDirty=true;$('angle').textContent='—';$('challenge-angle').textContent='—';$('raw').textContent='—';$('count').textContent='0';}
+function resetMeasurements(){latest=null;received=0;arrivals=[];changeTimes=[];recent=[];previousAngle=null;lastGap=null;nativePrevious=null;droppedNative=0;tableDirty=true;$('angle').textContent='—';$('challenge-angle').textContent='—';$('raw').textContent='—';$('count').textContent='0';window.HingeAppearance?.clear();}
 function receive(angle,raw,reportId,readMs,nativeTiming=null,eventAt=null){
  if(document.hidden)return;
  if(!Number.isInteger(angle)||angle<0||angle>360){log('Rejected an unrecognized angle.');return;}
  const now=performance.now();lastGap=latest?now-latest.at:null;received++;
  if(previousAngle!==null&&angle!==previousAngle)changeTimes.push(now);previousAngle=angle;
  latest={angle,raw,reportId,readMs,at:now,freshAt:now-(nativeTiming?.delayMs||0),nativeTiming};arrivals.push(now);arrivals=arrivals.filter(t=>now-t<=10000);changeTimes=changeTimes.filter(t=>now-t<=10000);
+ if(source)window.HingeAppearance?.update(angle);
  recent.unshift({time:localTime(Date.now()),gap:lastGap,angle,raw,source,nativeTiming});recent.length=Math.min(recent.length,16);tableDirty=true;
  $('angle').textContent=String(angle);$('challenge-angle').textContent=String(angle);$('raw').textContent=raw;$('count').textContent=String(received);
  if(source==='native'&&awaitingNativeReport){awaitingNativeReport=false;$('status').textContent='Native reader connected. Up to 60 reads/s; move the lid to check actual freshness.';render();closeDialog('connection-dialog');}
@@ -66,6 +67,7 @@ function receiveNative(item){
 async function stop(reason='Disconnected.'){
  generation++;if(challenge&&challenge.getState(performance.now()).status==='active')challenge.abort('Sensor source disconnected or changed.');
  const old=sensor;sensor=null;source=null;awaitingNativeReport=false;aborter?.abort();aborter=null;
+ window.HingeAppearance?.clear();
  if(old){old.removeEventListener('inputreport',input);try{if(old.opened)await old.close();}catch(e){log(e.message);}}
  $('status').textContent=reason;$('source-name').textContent='Disconnected · last value retained';buttons();render();
 }
@@ -169,6 +171,7 @@ function startChallenge(){
 }
 function render(){
  const now=performance.now(),age=latest?reportAge(now):null;buttons();
+ if(document.hidden||!source||!latest||age>freshnessLimit())window.HingeAppearance?.clear();
  const connectionText=source==='browser'?'Browser connected':source==='native'?'Native connected':'Disconnected';
  $('connection-state').textContent=connectionText;$('connection-state').dataset.connected=String(!!source);$('connection-state').setAttribute('aria-label',connectionText+'. Manage sensor connection');$('open-connect').hidden=!!source;$('telemetry').hidden=!source;
  $('freshness').textContent=document.hidden?'Paused while this page is hidden.':!latest?'Waiting for a fresh measurement.':(source?'':'Disconnected; ')+(latest.nativeTiming?'Native read completed ':'Last browser report received ')+Math.round(age)+' ms ago.';
@@ -202,6 +205,6 @@ document.addEventListener('visibilitychange',()=>{
  if(document.hidden)challenge?.abort('Page hidden. Start a new challenge after returning.');
  else {visibleSinceEpochMs=Date.now()+1;visibleSinceAt=performance.now();}
  // Resuming needs a new report; a pre-hide value cannot enable Start.
- latest=null;arrivals=[];changeTimes=[];previousAngle=null;lastGap=null;$('angle').textContent='—';$('challenge-angle').textContent='—';render();
+ latest=null;arrivals=[];changeTimes=[];previousAngle=null;lastGap=null;$('angle').textContent='—';$('challenge-angle').textContent='—';window.HingeAppearance?.clear();render();
 });
-setInterval(render,100);render();setupNavigation();
+window.HingeAppearance?.setup();setInterval(render,100);render();setupNavigation();

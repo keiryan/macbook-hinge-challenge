@@ -10,7 +10,7 @@ function fixture(options={}){
  const document={hidden:false,body:{dataset:{}},activeElement:null,getElementById(id){if(!elements.has(id)){const value=element();if(id.endsWith('-dialog')&&options.dialogSupported===false)delete value.showModal;elements.set(id,value);}return elements.get(id);},createElement:element,addEventListener(type,fn){listeners[type]=fn;}};
  class ClockDate extends Date {constructor(...args){super(...(args.length?args:[clock]));}static now(){return clock;}}
  const stored=new Map(),sessionStorage=options.sessionStorage||{getItem:key=>stored.get(key)??null,setItem:(key,value)=>stored.set(key,String(value))};
- const context=vm.createContext({document,Date:ClockDate,HingeChallenge,performance:{now:()=>clock},navigator:options.navigator||{},location:options.location||{hostname:'127.0.0.1',protocol:'http:'},isSecureContext:options.isSecureContext??true,sessionStorage,fetch:options.fetch||(()=>{throw new Error('Unexpected network request in offline test');}),AbortController,TextDecoder,window:{addEventListener(){}},requestAnimationFrame:()=>1,setInterval:()=>1,crypto:{getRandomValues(a){a[0]=0;return a;}}});
+ const context=vm.createContext({document,Date:ClockDate,HingeChallenge,performance:{now:()=>clock},navigator:options.navigator||{},location:options.location||{hostname:'127.0.0.1',protocol:'http:'},isSecureContext:options.isSecureContext??true,sessionStorage,fetch:options.fetch||(()=>{throw new Error('Unexpected network request in offline test');}),AbortController,TextDecoder,window:{addEventListener(){},HingeAppearance:options.appearance},requestAnimationFrame:()=>1,setInterval:()=>1,crypto:{getRandomValues(a){a[0]=0;return a;}}});
  vm.runInContext(script,context);
  return {context,document,setTime(value){clock=value;},run(code){return vm.runInContext(code,context);},hidden(value){document.hidden=value;listeners.visibilitychange();},event(type,event){listeners[type]?.(event);}};
 }
@@ -248,4 +248,24 @@ test('an asynchronous browser connection error reopens its visible status dialog
  await connecting;
  assert.equal(f.document.getElementById('connection-dialog').open,true);
  assert.match(f.document.getElementById('status').textContent,/Device permission failed/);
+});
+
+test('appearance follows only accepted reports and resets when data is stale, hidden, or disconnected',async()=>{
+ const updates=[];let clears=0,setups=0;
+ const f=fixture({appearance:{setup(){setups++;},update(angle){updates.push(angle);},clear(){clears++;}}});
+ assert.equal(setups,1);assert.deepEqual(updates,[]);
+ f.document.getElementById('compatibility-close').onclick();f.run('source="native";visibleSinceEpochMs=0;');
+ f.setTime(1020);deliver(f,packet({readCompletedEpochMs:1010,angle:270}));
+ assert.deepEqual(updates,[270]);
+ assert.equal(f.document.getElementById('angle').textContent,'270','decoration never clamps the real readout');
+ f.run('render()');assert.deepEqual(updates,[270],'display ticks do not invent measurements');
+ let before=clears;f.setTime(1200);f.run('render()');assert.ok(clears>before);
+ deliver(f,packet({sequence:2,readCompletedMonoMs:1000,readCompletedEpochMs:1010,angle:90}));
+ assert.deepEqual(updates,[270],'stale native packet cannot drive appearance');
+ f.setTime(1220);deliver(f,packet({sequence:3,readCompletedMonoMs:1100,readCompletedEpochMs:1210,angle:90}));
+ assert.deepEqual(updates,[270,90]);
+ before=clears;f.hidden(true);assert.ok(clears>before);
+ before=clears;f.run('resetMeasurements()');assert.ok(clears>before);
+ before=clears;await f.run('stop()');assert.ok(clears>before);
+ assert.deepEqual(updates,[270,90]);
 });

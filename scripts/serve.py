@@ -79,7 +79,7 @@ class Handler(BaseHTTPRequestHandler):
                         process.stdout.close()
                 sensor_lock.release()
             return
-        files = {'/': 'index.html', '/index.html': 'index.html', '/app.js': 'app.js', '/hinge-challenge.js': 'hinge-challenge.js'}
+        files = {'/': 'index.html', '/index.html': 'index.html', '/app.js': 'app.js', '/appearance.js': 'appearance.js', '/hinge-challenge.js': 'hinge-challenge.js'}
         if path not in files:
             return self.reply(404, b'Not found')
         mime = 'text/javascript; charset=utf-8' if path.endswith('.js') else 'text/html; charset=utf-8'

@@ -25,6 +25,7 @@ jobs:
         run: |
           python3 -m py_compile scripts/serve.py
           node --check web/app.js
+          node --check web/appearance.js
           node --check web/hinge-challenge.js
           bash -n scripts/run.sh
       - name: Compile native reader without opening a device
