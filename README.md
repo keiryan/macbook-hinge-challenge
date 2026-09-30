@@ -88,7 +88,7 @@ This uses an undocumented, model-dependent sensor interface. A MacBook may lack 
 
 ## The challenge
 
-For the best experience, use your browser in full screen. The challenge places three numbered targets on the background dial: guide the lid pointer to the lit point, hold while its ring fills, then continue to the next. Confirmed points become checkmarks. Nearby targets are staggered along the same angle so both remain readable.
+For the best experience, use your browser in full screen. The challenge places three numbered targets on the background dial: guide the lid pointer to the lit point, hold while its ring fills, then continue to the next. Confirmed points become checkmarks. During a run, only the current target is at full strength and the others are faded; when the run ends, all three return. Every target sits on the same ring: the current one at its exact angle, while nearby targets slide along the ring just far enough to stay readable. Their labels still show the true angle.
 
 Start after a fresh reading arrives. Three targets between 65° and 110° are generated using browser cryptographic randomness, each at least 12° from the preceding angle. Each step needs received readings within ±3° spanning at least 500 ms. There is a 60-second limit.
 

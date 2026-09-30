@@ -123,21 +123,57 @@ test('challenge markers share the lid geometry: 90 degrees above, lower angles r
   assert.ok(range[0] > 0 && range.at(-2) < 0, 'the ±3° target arc straddles the upright lid');
 });
 
-test('repeated or nearby first and third targets keep separate identities and prioritize the active outer marker', () => {
-  for (const thirdAngle of [75, 79]) {
+// Reads a marker's position back into dial polar coordinates.
+function polar(node) {
+  const x = (parseFloat(node.style.left) - 50) * 2, y = 100 - parseFloat(node.style.top);
+  return { radius: Math.hypot(x, y), angle: Math.atan2(y, x) * 180 / Math.PI };
+}
+
+test('nearby or repeated targets stay on one ring, and the active one keeps its exact angle', () => {
+  for (const thirdAngle of [75, 76, 79]) {
     const f = fixture(), nodes = f.dial();
     const challenge = new HingeChallenge({ targets: [75, 100, thirdAngle], startedAt: 0 });
-    f.api.challengeState(challenge.getState());
-    assert.ok(parseFloat(nodes['dial-target-0'].style.top) < parseFloat(nodes['dial-target-2'].style.top));
     for (const [angle, time] of [[75, 0], [75, 500], [100, 600], [100, 1100]]) challenge.update(angle, time);
     f.api.challengeState(challenge.getState());
     assert.equal(nodes['dial-target-0'].dataset.state, 'done');
     assert.equal(nodes['dial-number-0'].textContent, '✓');
     assert.equal(nodes['dial-target-2'].dataset.state, 'active');
     assert.equal(nodes['dial-number-2'].textContent, '3');
-    assert.ok(parseFloat(nodes['dial-target-2'].style.top) < parseFloat(nodes['dial-target-0'].style.top), 'the current target remains on the outer dial');
-    assert.notEqual(nodes['dial-target-0'].style.top, nodes['dial-target-2'].style.top);
+    const markers = [0, 1, 2].map(i => polar(nodes['dial-target-' + i]));
+    for (const marker of markers) assert.ok(Math.abs(marker.radius - 96.5) < 1e-9, 'every marker sits on the same ring');
+    assert.ok(Math.abs(markers[2].angle - thirdAngle) < 1e-9, 'the active target is not displaced');
+    assert.ok(Math.abs(markers[2].angle - markers[0].angle) >= 4.3, 'the nearby completed target moves aside along the ring');
+    assert.equal(nodes['dial-angle-0'].textContent, '75°', 'a moved marker still names its true angle');
   }
+});
+
+test('markers spread only as far as needed, centering a close pair once no target is active', () => {
+  const { api } = fixture();
+  // The script runs in its own VM context; copy results into this realm's arrays.
+  const spreadAlongDial = (...args) => [...api.spreadAlongDial(...args)];
+  assert.deepEqual(spreadAlongDial([90, 65, 110], 4), [90, 65, 110], 'well separated targets never move');
+  const ended = spreadAlongDial([67, 81, 68], 4);
+  assert.equal(ended[1], 81);
+  assert.ok(Math.abs(ended[0] - 65.5) < 1e-9 && Math.abs(ended[2] - 69.5) < 1e-9, 'the pair centers on 67.5°');
+  const pinned = spreadAlongDial([67, 81, 68], 4, 2);
+  assert.equal(pinned[2], 68);
+  assert.equal(pinned[0], 64);
+  const same = spreadAlongDial([75, 100, 75], 4);
+  assert.ok(same[0] < same[2], 'identical angles keep a stable order: target 1 to the right of target 3');
+  const chain = spreadAlongDial([70, 72, 74], 4, 1);
+  assert.deepEqual(chain, [68, 72, 76], 'a cluster around the pinned marker grows outward on both sides');
+});
+
+test('during a run the dial is marked running so only the active target stays at full strength', () => {
+  const f = fixture(), nodes = f.dial();
+  const challenge = new HingeChallenge({ targets: [75, 100, 80], startedAt: 0 });
+  f.api.challengeState(challenge.getState());
+  assert.equal(nodes['challenge-dial'].dataset.phase, 'running');
+  assert.deepEqual([0, 1, 2].map(i => nodes['dial-target-' + i].dataset.state), ['active', 'pending', 'pending']);
+  for (const [angle, time] of [[75, 0], [75, 500], [100, 600], [100, 1100], [80, 1200], [80, 1700]]) challenge.update(angle, time);
+  f.api.challengeState(challenge.getState());
+  assert.equal(nodes['challenge-dial'].dataset.phase, 'ended', 'all three return to full strength at the end');
+  assert.deepEqual([0, 1, 2].map(i => nodes['dial-target-' + i].dataset.state), ['done', 'done', 'done']);
 });
 
 test('pass, abort, and expiry never render a phantom active target from a null target value', () => {

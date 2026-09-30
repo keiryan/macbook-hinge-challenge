@@ -64,28 +64,57 @@
     delete root.dataset.lidEntrance;
   }
 
+  // Spreads markers along the dial so none sit closer than `gap` degrees.
+  // Overlapping markers form a cluster centered on their mean angle; a
+  // cluster holding the pinned (active) marker is anchored on that marker's
+  // exact angle instead, so only its neighbors move. Returns display angles.
+  function spreadAlongDial(angles, gap, pinned = -1) {
+    const order = angles.map((_, i) => i).sort((a, b) => angles[a] - angles[b] || a - b);
+    const clusters = order.map(i => ({ members: [i] }));
+    const place = cluster => {
+      const n = cluster.members.length, pin = cluster.members.indexOf(pinned);
+      cluster.start = pin >= 0
+        ? angles[pinned] - pin * gap
+        : cluster.members.reduce((sum, i) => sum + angles[i], 0) / n - (n - 1) * gap / 2;
+      cluster.end = cluster.start + (n - 1) * gap;
+    };
+    clusters.forEach(place);
+    for (let k = 0; k < clusters.length - 1;) {
+      if (clusters[k + 1].start - clusters[k].end < gap - 1e-9) {
+        clusters[k].members.push(...clusters[k + 1].members);
+        clusters.splice(k + 1, 1);
+        place(clusters[k]);
+        k = Math.max(0, k - 1);
+      } else k++;
+    }
+    const shown = [];
+    for (const cluster of clusters) cluster.members.forEach((i, k) => { shown[i] = cluster.start + k * gap; });
+    return shown;
+  }
+
   // Targets share the lid's polar coordinates: 0° points right, 90° up.
-  // A repeated/nearby later target sits inward on the same radial line.
+  // Every marker sits on the same ring. The active target keeps its exact
+  // angle; nearby markers slide along the ring just far enough to stay
+  // legible, and their labels still name the true target angle.
+  const markerGapPx = 44, bandClearPx = 22;
   function challengeState(state, fresh = true) {
     const dial = document.getElementById('challenge-dial');
     if (!dial) return;
     dial.hidden = !state;
     if (!state) return;
     const active = state.status === 'active' ? state.stageIndex : -1;
-    const spacing = Math.max(7, 4200 / (dial.clientHeight || 600));
-    const placed = [];
-    const order = state.targets.map((_, i) => i).sort((a, b) => (b === active) - (a === active));
-    for (const i of order) {
-      const angle = state.targets[i], radians = angle * Math.PI / 180;
-      let radius = 96.5;
-      while (placed.some(p => Math.abs(p.angle - angle) < 10 && p.radius === radius)) radius -= spacing;
-      placed.push({ angle, radius });
+    dial.dataset.phase = active >= 0 ? 'running' : 'ended';
+    const radiusPx = 0.965 * (dial.clientHeight || 600), degreesPerPx = 180 / Math.PI / radiusPx;
+    // While a target is live, neighbors also clear its lit ±3° band.
+    const gap = Math.max(markerGapPx * degreesPerPx, active >= 0 ? 3 + bandClearPx * degreesPerPx : 0);
+    const shown = spreadAlongDial(state.targets, gap, active);
+    for (let i = 0; i < state.targets.length; i++) {
+      const angle = state.targets[i], radians = shown[i] * Math.PI / 180;
       const marker = document.getElementById('dial-target-' + i);
       const done = i < state.completedStages;
       marker.dataset.state = done ? 'done' : i === active ? 'active' : state.status === 'active' ? 'pending' : 'stopped';
-      marker.dataset.inset = String(radius < 96.5);
-      marker.style.left = (50 + Math.cos(radians) * radius / 2) + '%';
-      marker.style.top = (100 - Math.sin(radians) * radius) + '%';
+      marker.style.left = (50 + Math.cos(radians) * 96.5 / 2) + '%';
+      marker.style.top = (100 - Math.sin(radians) * 96.5) + '%';
       marker.style.setProperty('--hold-progress', String(done ? 1 : i === active && fresh ? state.holdProgress : 0));
       document.getElementById('dial-number-' + i).textContent = done ? '✓' : String(i + 1);
       document.getElementById('dial-angle-' + i).textContent = angle + '°';
@@ -103,5 +132,5 @@
   // the page paints. Controls bind later, after app.js sees the body.
   syncTheme();
   clear();
-  window.HingeAppearance = { setup, update, clear, challengeState };
+  window.HingeAppearance = { setup, update, clear, challengeState, spreadAlongDial };
 })();
