@@ -176,7 +176,6 @@ function render(){
  if(document.hidden||!source||!latest||age>freshnessLimit())window.HingeAppearance?.clear();
  const connectionText=source==='browser'?'Browser connected':source==='native'?'Native connected':'Disconnected';
  $('connection-state').textContent=connectionText;$('connection-state').dataset.connected=String(!!source);$('connection-state').setAttribute('aria-label',connectionText+'. Manage sensor connection');$('open-connect').hidden=!!source;$('telemetry').hidden=!source;
- $('freshness').textContent=document.hidden?'Paused while this page is hidden.':!latest?'Waiting for a fresh measurement.':(source?'':'Disconnected; ')+(latest.nativeTiming?'Native read completed ':'Last browser report received ')+Math.round(age)+' ms ago.';
  const windowTimes=arrivals.filter(t=>now-t<=10000);$('rate').textContent=windowTimes.length>1?((windowTimes.length-1)*1000/(windowTimes.at(-1)-windowTimes[0])).toFixed(1)+' / second (recent)':'—';
  $('interval').textContent=lastGap===null?'—':lastGap.toFixed(1)+' ms';$('changes').textContent=changeTimes.filter(t=>now-t<=10000).length+' value changes / last 10 s';
  $('native-timing').textContent=latest?.nativeTiming?(latest.nativeTiming.readGapMs===null?'First read':latest.nativeTiming.readGapMs.toFixed(1)+' ms between reads')+' · '+latest.readMs.toFixed(1)+' ms request · '+latest.nativeTiming.delayMs.toFixed(1)+' ms to browser':'—';$('discarded').textContent=String(droppedNative);
