@@ -4,14 +4,19 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
+const { HingeChallenge } = require('../web/hinge-challenge.js');
 const script = fs.readFileSync(path.join(__dirname, '../web/appearance.js'), 'utf8');
 
 function fixture(options = {}) {
   const properties = new Map(), elements = new Map(), stored = new Map();
   if (options.saved !== undefined) stored.set('hinge-theme', options.saved);
   function element() {
-    const attributes = new Map();
-    return { setAttribute: (name, value) => attributes.set(name, value), getAttribute: name => attributes.get(name) };
+    const attributes = new Map(), styles = new Map();
+    return {
+      dataset: {}, hidden: false, textContent: '',
+      style: { setProperty: (name, value) => styles.set(name, value), getPropertyValue: name => styles.get(name) },
+      setAttribute: (name, value) => attributes.set(name, value), getAttribute: name => attributes.get(name)
+    };
   }
   const meta = element();
   const root = { dataset: {}, style: { setProperty: (name, value) => properties.set(name, value) } };
@@ -23,6 +28,9 @@ function fixture(options = {}) {
   return { root, meta, properties, stored, clock, api: context.window.HingeAppearance, controls() {
     for (const id of ['theme-toggle', 'theme-dark', 'theme-light']) elements.set(id, element());
     context.window.HingeAppearance.setup();
+    return Object.fromEntries(elements);
+  }, dial() {
+    for (const id of ['challenge-dial', 'dial-range', ...[0, 1, 2].flatMap(i => ['dial-target-' + i, 'dial-number-' + i, 'dial-angle-' + i])]) elements.set(id, element());
     return Object.fromEntries(elements);
   } };
 }
@@ -98,4 +106,89 @@ test('the lid opening plays on first reading and after a real pause, not after b
   f.api.clear();
   f.api.update(108);
   assert.equal(f.root.dataset.lidEntrance, 'play', 'a 2 s pause replays the opening');
+});
+
+test('challenge markers share the lid geometry: 90 degrees above, lower angles right, higher angles left', () => {
+  const f = fixture(), nodes = f.dial();
+  const challenge = new HingeChallenge({ targets: [90, 65, 110], startedAt: 0 });
+  f.api.challengeState(challenge.getState());
+  assert.equal(nodes['challenge-dial'].hidden, false);
+  assert.ok(Math.abs(parseFloat(nodes['dial-target-0'].style.left) - 50) < 1e-9);
+  assert.ok(parseFloat(nodes['dial-target-0'].style.top) < 5);
+  assert.ok(parseFloat(nodes['dial-target-1'].style.left) > 50);
+  assert.ok(parseFloat(nodes['dial-target-2'].style.left) < 50);
+  assert.deepEqual([0, 1, 2].map(i => nodes['dial-angle-' + i].textContent), ['90°', '65°', '110°']);
+  const range = nodes['dial-range'].getAttribute('d').match(/-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/gi).map(Number);
+  assert.ok(range.every(Number.isFinite));
+  assert.ok(range[0] > 0 && range.at(-2) < 0, 'the ±3° target arc straddles the upright lid');
+});
+
+test('repeated or nearby first and third targets keep separate identities and prioritize the active outer marker', () => {
+  for (const thirdAngle of [75, 79]) {
+    const f = fixture(), nodes = f.dial();
+    const challenge = new HingeChallenge({ targets: [75, 100, thirdAngle], startedAt: 0 });
+    f.api.challengeState(challenge.getState());
+    assert.ok(parseFloat(nodes['dial-target-0'].style.top) < parseFloat(nodes['dial-target-2'].style.top));
+    for (const [angle, time] of [[75, 0], [75, 500], [100, 600], [100, 1100]]) challenge.update(angle, time);
+    f.api.challengeState(challenge.getState());
+    assert.equal(nodes['dial-target-0'].dataset.state, 'done');
+    assert.equal(nodes['dial-number-0'].textContent, '✓');
+    assert.equal(nodes['dial-target-2'].dataset.state, 'active');
+    assert.equal(nodes['dial-number-2'].textContent, '3');
+    assert.ok(parseFloat(nodes['dial-target-2'].style.top) < parseFloat(nodes['dial-target-0'].style.top), 'the current target remains on the outer dial');
+    assert.notEqual(nodes['dial-target-0'].style.top, nodes['dial-target-2'].style.top);
+  }
+});
+
+test('pass, abort, and expiry never render a phantom active target from a null target value', () => {
+  for (const ending of ['passed', 'aborted', 'expired']) {
+    const f = fixture(), nodes = f.dial();
+    const challenge = new HingeChallenge({ targets: [75, 100, 80], startedAt: 0 });
+    challenge.update(75, 0); challenge.update(75, 500);
+    if (ending === 'passed') {
+      for (const [angle, time] of [[100, 600], [100, 1100], [80, 1200], [80, 1700]]) challenge.update(angle, time);
+    } else if (ending === 'aborted') challenge.abort('test interruption');
+    else challenge.tick(60000);
+    const state = challenge.getState();
+    assert.equal(state.status, ending);
+    assert.equal(state.target, null);
+    f.api.challengeState(state, false);
+    assert.equal(nodes['dial-range'].style.display, 'none');
+    assert.deepEqual([0, 1, 2].map(i => nodes['dial-target-' + i].dataset.state), ending === 'passed' ? ['done', 'done', 'done'] : ['done', 'stopped', 'stopped']);
+    assert.equal(nodes['dial-number-0'].textContent, '✓');
+    if (ending === 'passed') assert.equal(nodes['dial-number-2'].textContent, '✓');
+  }
+});
+
+test('hiding and restarting the dial replaces previous target labels, completion, and hold feedback', () => {
+  const f = fixture(), nodes = f.dial();
+  const previous = new HingeChallenge({ targets: [75, 100, 80], startedAt: 0 });
+  for (const [angle, time] of [[75, 0], [75, 500], [100, 600], [100, 1100], [80, 1200], [80, 1700]]) previous.update(angle, time);
+  f.api.challengeState(previous.getState());
+  f.api.challengeState(null);
+  assert.equal(nodes['challenge-dial'].hidden, true);
+  const next = new HingeChallenge({ targets: [90, 70, 105], startedAt: 2000 });
+  f.api.challengeState(next.getState());
+  assert.equal(nodes['challenge-dial'].hidden, false);
+  assert.equal(nodes['dial-range'].style.display, '');
+  assert.deepEqual([0, 1, 2].map(i => nodes['dial-angle-' + i].textContent), ['90°', '70°', '105°']);
+  assert.deepEqual([0, 1, 2].map(i => nodes['dial-number-' + i].textContent), ['1', '2', '3']);
+  assert.deepEqual([0, 1, 2].map(i => nodes['dial-target-' + i].dataset.state), ['active', 'pending', 'pending']);
+  for (const i of [0, 1, 2]) assert.equal(nodes['dial-target-' + i].style.getPropertyValue('--hold-progress'), '0');
+});
+
+test('stale readings suppress current holding feedback while retaining completed stages and the target', () => {
+  const f = fixture(), nodes = f.dial();
+  const challenge = new HingeChallenge({ targets: [75, 100, 80], startedAt: 0 });
+  for (const [angle, time] of [[75, 0], [75, 500], [100, 600], [100, 800]]) challenge.update(angle, time);
+  const state = challenge.getState();
+  assert.equal(state.holdProgress, 0.4);
+  f.api.challengeState(state, true);
+  assert.equal(nodes['dial-target-1'].style.getPropertyValue('--hold-progress'), '0.4');
+  f.api.challengeState(state, false);
+  assert.equal(nodes['dial-target-1'].style.getPropertyValue('--hold-progress'), '0');
+  assert.equal(nodes['dial-target-1'].dataset.state, 'active');
+  assert.equal(nodes['dial-range'].style.display, '');
+  assert.equal(nodes['dial-target-0'].dataset.state, 'done');
+  assert.equal(challenge.getState().holdProgress, 0.4, 'presentation does not mutate challenge evidence');
 });

@@ -64,9 +64,44 @@
     delete root.dataset.lidEntrance;
   }
 
+  // Targets share the lid's polar coordinates: 0° points right, 90° up.
+  // A repeated/nearby later target sits inward on the same radial line.
+  function challengeState(state, fresh = true) {
+    const dial = document.getElementById('challenge-dial');
+    if (!dial) return;
+    dial.hidden = !state;
+    if (!state) return;
+    const active = state.status === 'active' ? state.stageIndex : -1;
+    const spacing = Math.max(7, 4200 / (dial.clientHeight || 600));
+    const placed = [];
+    const order = state.targets.map((_, i) => i).sort((a, b) => (b === active) - (a === active));
+    for (const i of order) {
+      const angle = state.targets[i], radians = angle * Math.PI / 180;
+      let radius = 96.5;
+      while (placed.some(p => Math.abs(p.angle - angle) < 10 && p.radius === radius)) radius -= spacing;
+      placed.push({ angle, radius });
+      const marker = document.getElementById('dial-target-' + i);
+      const done = i < state.completedStages;
+      marker.dataset.state = done ? 'done' : i === active ? 'active' : state.status === 'active' ? 'pending' : 'stopped';
+      marker.dataset.inset = String(radius < 96.5);
+      marker.style.left = (50 + Math.cos(radians) * radius / 2) + '%';
+      marker.style.top = (100 - Math.sin(radians) * radius) + '%';
+      marker.style.setProperty('--hold-progress', String(done ? 1 : i === active && fresh ? state.holdProgress : 0));
+      document.getElementById('dial-number-' + i).textContent = done ? '✓' : String(i + 1);
+      document.getElementById('dial-angle-' + i).textContent = angle + '°';
+    }
+    const range = document.getElementById('dial-range');
+    range.style.display = active < 0 ? 'none' : '';
+    if (active >= 0) {
+      const point = angle => [96.5 * Math.cos(angle * Math.PI / 180), -96.5 * Math.sin(angle * Math.PI / 180)];
+      const from = point(state.target - 3), to = point(state.target + 3);
+      range.setAttribute('d', 'M' + from.join(' ') + ' A96.5 96.5 0 0 0 ' + to.join(' '));
+    }
+  }
+
   // Loaded synchronously in <head> so the selected palette exists before
   // the page paints. Controls bind later, after app.js sees the body.
   syncTheme();
   clear();
-  window.HingeAppearance = { setup, update, clear };
+  window.HingeAppearance = { setup, update, clear, challengeState };
 })();
