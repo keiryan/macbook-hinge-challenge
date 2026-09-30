@@ -6,7 +6,7 @@ The demo supports direct browser access through WebHID and an optional Swift hel
 
 The instrument fills the browser window with the live angle. Once connected, arrival rates, timing, and raw readings appear along the bottom. Open **Menu** for the full-screen **Hinge challenge**, sensor connections, and diagnostics. The welcome guide appears once per tab session and can always be reopened through **Menu → About & setup**.
 
-Dark mode opens by default, with a light option in the header or **Menu → Appearance**. Your choice is saved in this browser. A soft cyan-and-violet horizon rises and tilts with fresh lid readings, then fades when readings go stale or the sensor disconnects. Its short visual transitions do not smooth or alter the numeric angle. The moving background is hidden when reduced motion is enabled. The welcome guide includes a Safari compass with a red X to highlight that direct browser access requires Chrome or Edge; Safari can use the local native reader.
+Dark mode opens by default, with a light option in the header or **Menu → Appearance**. Your choice is saved in this browser. The background draws your lid in profile: the footer rule is the keyboard deck, a hinge sits at its center, and a line swings to each fresh reading while screen light fills the opening and lights the dial ticks inside it. The lid sweeps open when readings start or return after a pause, then fades when readings go stale or the sensor disconnects. Its short visual transitions do not smooth or alter the numeric angle. With reduced motion enabled, the live view hides the moving decoration; the challenge keeps an unanimated pointer for guidance. The welcome guide includes a Safari compass with a red X to highlight that direct browser access requires Chrome or Edge; Safari can use the local native reader.
 
 > **For smoother tracking, use native mode.** On the tested Mac, native mode delivered about **50 sensor reads per second**, compared with about **one browser report per second**: roughly **50× more frequent readings**. [Run the native reader locally](#run-locally). These are observed read rates; results vary by Mac. See [what to expect](#what-to-expect) for the measurement limits.
 
@@ -87,6 +87,8 @@ The roughly **50× difference is in reading frequency**. The user physically mov
 This uses an undocumented, model-dependent sensor interface. A MacBook may lack the expected sensor or expose different reports. Compatibility across models and macOS releases is unverified. If no sensor appears, the demo cannot provide a reading. Move the screen gently within its normal range; never force the hinge.
 
 ## The challenge
+
+For the best experience, use your browser in full screen. The challenge places three numbered targets on the background dial: guide the lid pointer to the lit point, hold while its ring fills, then continue to the next. Confirmed points become checkmarks. Nearby targets are staggered along the same angle so both remain readable.
 
 Start after a fresh reading arrives. Three targets between 65° and 110° are generated using browser cryptographic randomness, each at least 12° from the preceding angle. Each step needs received readings within ±3° spanning at least 500 ms. There is a 60-second limit.
 

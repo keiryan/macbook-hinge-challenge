@@ -103,10 +103,10 @@ test('welcome dismissal persists for the session and About can reopen it',()=>{
  const sessionStorage={getItem:key=>stored.get(key)??null,setItem:(key,value)=>stored.set(key,value)};
  const first=fixture({location,sessionStorage}),dialog=first.document.getElementById('compatibility-dialog');
  assert.equal(dialog.open,true);assert.equal(dialog.showModalCalls,1);
- assert.equal(stored.has('hinge-welcome-dismissed-v1'),false,'opening is not acknowledgment');
+ assert.equal(stored.has('hinge-welcome-dismissed-v2'),false,'opening is not acknowledgment');
  first.document.getElementById('compatibility-dismiss').onclick();
  assert.equal(dialog.open,false);assert.equal(dialog.closeCalls,1);
- assert.equal(stored.get('hinge-welcome-dismissed-v1'),'1');
+ assert.equal(stored.get('hinge-welcome-dismissed-v2'),'1');
  const revisit=fixture({location,sessionStorage});
  assert.equal(revisit.document.getElementById('compatibility-dialog').showModalCalls,0);
  revisit.document.getElementById('menu-about').onclick();
@@ -118,7 +118,7 @@ test('welcome dismissal persists for the session and About can reopen it',()=>{
 test('native dialog close also acknowledges Escape dismissal',()=>{
  const f=fixture({location:{hostname:'hinge-demo.example',protocol:'https:'}});
  f.document.getElementById('compatibility-dialog').close();
- assert.equal(f.context.sessionStorage.getItem('hinge-welcome-dismissed-v1'),'1');
+ assert.equal(f.context.sessionStorage.getItem('hinge-welcome-dismissed-v2'),'1');
 });
 
 test('welcome opens on first visit for all browsers and shows compatibility only when needed',()=>{
@@ -252,7 +252,7 @@ test('an asynchronous browser connection error reopens its visible status dialog
 
 test('appearance follows only accepted reports and resets when data is stale, hidden, or disconnected',async()=>{
  const updates=[];let clears=0,setups=0;
- const f=fixture({appearance:{setup(){setups++;},update(angle){updates.push(angle);},clear(){clears++;}}});
+ const f=fixture({appearance:{setup(){setups++;},update(angle){updates.push(angle);},clear(){clears++;},challengeState(){}}});
  assert.equal(setups,1);assert.deepEqual(updates,[]);
  f.document.getElementById('compatibility-close').onclick();f.run('source="native";visibleSinceEpochMs=0;');
  f.setTime(1020);deliver(f,packet({readCompletedEpochMs:1010,angle:270}));

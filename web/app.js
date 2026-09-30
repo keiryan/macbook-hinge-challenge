@@ -142,7 +142,7 @@ function openDialog(id){
  render();
 }
 function setupNavigation(){
- const welcomeKey='hinge-welcome-dismissed-v1';
+ const welcomeKey='hinge-welcome-dismissed-v2';
  for(const id of dialogIds)$(id)?.addEventListener('close',()=>{
   if(id==='compatibility-dialog')try{sessionStorage.setItem(welcomeKey,'1');}catch{}
   const previous=dialogFocus.get(id);(visibleFocusTarget(previous)?previous:$('connection-state')).focus();
@@ -179,20 +179,18 @@ function render(){
  $('interval').textContent=lastGap===null?'—':lastGap.toFixed(1)+' ms';$('changes').textContent=changeTimes.filter(t=>now-t<=10000).length+' value changes / last 10 s';
  $('native-timing').textContent=latest?.nativeTiming?(latest.nativeTiming.readGapMs===null?'First read':latest.nativeTiming.readGapMs.toFixed(1)+' ms between reads')+' · '+latest.readMs.toFixed(1)+' ms request · '+latest.nativeTiming.delayMs.toFixed(1)+' ms to browser':'—';$('discarded').textContent=String(droppedNative);
  const state=challenge?challenge.tick(now):null;
+ const fresh=!document.hidden&&!!source&&age!==null&&age<=freshnessLimit();
  document.body.dataset.challengeState=state?.status||'idle';
- $('dot').style.display=latest?'block':'none';if(latest)$('dot').style.left=Math.max(0,Math.min(100,(latest.angle-55)/70*100))+'%';
- $('band').style.display=state?.status==='active'?'block':'none';
- for(let i=0;i<3;i++)$('step'+i).className='step'+(state&&i<state.completedStages?' done':state?.status==='active'&&i===state.stageIndex?' active':'');
+ window.HingeAppearance?.challengeState(currentView==='challenge'?state:null, fresh);
  if(state?.status==='active'){
   $('target').textContent=state.target+'°';const delta=latest?state.target-latest.angle:null;
-  $('challenge-status').textContent=age===null||age>freshnessLimit()?'Waiting for a fresh sensor report.':Math.abs(delta)<=3?'On target. Stay near it until successive reports confirm this step.':(delta>0?'Open':'Close')+' the screen a little to reach the target.';
-  $('band').style.left=(state.target-3-55)/70*100+'%';$('band').style.width=6/70*100+'%';
-  $('hold').value=state.holdProgress;$('challenge-meta').textContent='Step '+(state.stageIndex+1)+' of 3 · '+Math.ceil(state.remainingMs/1000)+' s remaining';
+  $('challenge-status').textContent=age===null||age>freshnessLimit()?'Waiting for a fresh sensor report.':Math.abs(delta)<=3?'Hold here. Let the ring fill.':(delta>0?'Open':'Close')+' the screen until the pointer meets the lit target.';
+  $('hold').value=fresh?state.holdProgress:0;$('challenge-meta').textContent='Step '+(state.stageIndex+1)+' of 3 · '+Math.ceil(state.remainingMs/1000)+' s remaining';
  }else if(state){
   $('hold').value=state.status==='passed'?1:0;$('target').textContent=state.status==='passed'?'Challenge completed.':state.status==='expired'?'Time ran out.':'Challenge stopped.';
   $('challenge-status').textContent=state.status==='passed'?'All three targets were confirmed by received sensor reports.':state.reason||'Start again when ready.';
   $('challenge-meta').textContent=state.status==='passed'?'Local result · '+(state.elapsedMs/1000).toFixed(1)+' seconds':'Targets stay between 65° and 110°.';
- }else{$('challenge-status').textContent=source&&latest?'Ready. Start to receive your first target.':'Connect a sensor and receive a fresh angle to begin.';}
+ }else{$('challenge-status').textContent=source&&latest?'Follow three points on the dial. Hold within ±3° of each.':'Connect a sensor and receive a fresh angle to begin.';}
  if(tableDirty&&now-lastRender>250){$('rows').textContent='';for(const item of recent){const row=document.createElement('tr');for(const value of [item.time,item.gap===null?'—':item.gap.toFixed(1)+' ms',item.nativeTiming?localTime(item.nativeTiming.readCompletedEpochMs):'—',item.nativeTiming?item.nativeTiming.delayMs.toFixed(1)+' ms':'—',item.source,item.raw,item.angle+'°']){const td=document.createElement('td');td.textContent=value;row.append(td);}$('rows').append(row);}tableDirty=false;lastRender=now;}
 }
 $('connect').onclick=browserConnect;$('native').onclick=nativeConnect;$('stop').onclick=async()=>{busy=true;buttons();await stop();busy=false;buttons();};$('start').onclick=startChallenge;$('cancel').onclick=()=>{challenge?.abort('Cancelled.');render();};
